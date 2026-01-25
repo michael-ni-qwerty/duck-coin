@@ -1,0 +1,127 @@
+# ============================================================================
+# DuckCoin Project .gitignore
+# ============================================================================
+
+# ============================================================================
+# Solana / Anchor
+# ============================================================================
+smart_contracts/target/
+smart_contracts/.anchor/
+smart_contracts/test-ledger/
+smart_contracts/node_modules/
+smart_contracts/.yarn/
+
+# Anchor build artifacts
+*.so
+*.dylib
+
+# ============================================================================
+# Python / Backend
+# ============================================================================
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.py[cod]
+backend/**/*.py[cod]
+backend/*$py.class
+backend/**/*$py.class
+
+# Virtual environments
+backend/venv/
+backend/.venv/
+backend/env/
+backend/.env
+backend/*.env
+!backend/.env.example
+
+# Python packaging
+backend/*.egg-info/
+backend/dist/
+backend/build/
+backend/.eggs/
+
+# pytest
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+
+# mypy
+backend/.mypy_cache/
+
+# Ruff
+backend/.ruff_cache/
+
+# ============================================================================
+# IDE / Editor
+# ============================================================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ============================================================================
+# Node.js (for Anchor tests)
+# ============================================================================
+node_modules/
+package-lock.json
+yarn.lock
+.yarn/
+
+# ============================================================================
+# Environment & Secrets
+# ============================================================================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets/
+.secrets/
+
+# Solana keypairs (NEVER commit these!)
+*.json
+!package.json
+!tsconfig.json
+!Anchor.toml
+!Cargo.toml
+!backend/**/*.json
+!smart_contracts/Anchor.toml
+
+# ============================================================================
+# Logs
+# ============================================================================
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============================================================================
+# Database
+# ============================================================================
+*.db
+*.sqlite
+*.sqlite3
+
+# ============================================================================
+# Docker
+# ============================================================================
+docker-compose.override.yml
+
+# ============================================================================
+# Atlas Migrations (keep migrations, ignore temp files)
+# ============================================================================
+backend/atlas/schema_current.sql
+
+# ============================================================================
+# Misc
+# ============================================================================
+*.tmp
+*.temp
+*.bak
+*.backup
+.cache/
+tmp/
+temp/
