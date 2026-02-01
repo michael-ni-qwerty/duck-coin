@@ -24,6 +24,7 @@ backend/*.py[cod]
 backend/**/*.py[cod]
 backend/*$py.class
 backend/**/*$py.class
+.venv/
 
 # Virtual environments
 backend/venv/

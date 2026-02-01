@@ -1,0 +1,64 @@
+use anchor_lang::prelude::*;
+use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use crate::state::*;
+use crate::constants::*;
+use crate::errors::PresaleError;
+
+pub fn claim(ctx: Context<Claim>) -> Result<()> {
+    let config = &ctx.accounts.config;
+    require!(config.status == PresaleStatus::TokenLaunched, PresaleError::NotLaunched);
+
+    let allocation = &mut ctx.accounts.user_allocation;
+    let amount_to_claim = allocation.claimable_amount;
+
+    require!(amount_to_claim > 0, PresaleError::NothingToClaim);
+
+    let seeds = &[
+        SEED_VAULT,
+        config.to_account_info().key.as_ref(),
+        &[ctx.bumps.vault_token_account],
+    ];
+    let signer = &[&seeds[..]];
+
+    let cpi_accounts = Transfer {
+        from: ctx.accounts.vault_token_account.to_account_info(),
+        to: ctx.accounts.user_token_account.to_account_info(),
+        authority: ctx.accounts.vault_token_account.to_account_info(),
+    };
+    let cpi_program = ctx.accounts.token_program.to_account_info();
+    let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
+    token::transfer(cpi_ctx, amount_to_claim)?;
+
+    allocation.claimable_amount = 0;
+    allocation.amount_claimed += amount_to_claim;
+
+    emit!(crate::ClaimEvent {
+        user: ctx.accounts.user.key(),
+        amount: amount_to_claim,
+    });
+
+    Ok(())
+}
+
+#[derive(Accounts)]
+pub struct Claim<'info> {
+    #[account(seeds = [SEED_CONFIG], bump = config.bump)]
+    pub config: Account<'info, PresaleConfig>,
+    #[account(
+        mut,
+        seeds = [SEED_ALLOCATION, user.key().as_ref()],
+        bump,
+    )]
+    pub user_allocation: Account<'info, UserAllocation>,
+    #[account(mut)]
+    pub user: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [SEED_VAULT, config.key().as_ref()],
+        bump,
+    )]
+    pub vault_token_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_token_account: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+}
