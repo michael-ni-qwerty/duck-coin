@@ -54,3 +54,27 @@ ALTER TABLE payments ADD CONSTRAINT chk_payment_status
 ALTER TABLE payments DROP CONSTRAINT IF EXISTS chk_credit_status;
 ALTER TABLE payments ADD CONSTRAINT chk_credit_status
     CHECK (credit_status IN ('pending', 'credited', 'failed'));
+
+-- Investors table: aggregated per-wallet investment data
+CREATE TABLE IF NOT EXISTS investors (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    wallet_address VARCHAR(128) NOT NULL UNIQUE,
+
+    -- Aggregated totals (updated on each credited payment)
+    total_invested_usd NUMERIC(18, 2) NOT NULL DEFAULT 0,
+    total_tokens BIGINT NOT NULL DEFAULT 0,
+    payment_count INTEGER NOT NULL DEFAULT 0,
+
+    -- Flexible metadata
+    extra_data JSONB NOT NULL DEFAULT '{}',
+
+    -- First / last activity
+    first_invested_at TIMESTAMPTZ,
+    last_invested_at TIMESTAMPTZ,
+
+    -- Timestamps
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_investors_wallet_address ON investors(wallet_address);

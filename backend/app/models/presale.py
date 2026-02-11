@@ -60,3 +60,29 @@ class Payment(models.Model):
 
     class Meta:
         table = "payments"
+
+
+class Investor(models.Model):
+    """Aggregated investor profile per wallet address."""
+
+    id = fields.UUIDField(pk=True)
+    wallet_address = fields.CharField(max_length=128, unique=True, index=True)
+
+    # Aggregated totals (updated on each credited payment)
+    total_invested_usd = fields.DecimalField(max_digits=18, decimal_places=2, default=0)
+    total_tokens = fields.BigIntField(default=0)
+    payment_count = fields.IntField(default=0)
+
+    # Flexible metadata (JSONB)
+    extra_data = fields.JSONField(default=dict)
+
+    # First / last activity
+    first_invested_at = fields.DatetimeField(null=True)
+    last_invested_at = fields.DatetimeField(null=True)
+
+    # Timestamps
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "investors"

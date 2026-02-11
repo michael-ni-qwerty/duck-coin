@@ -85,6 +85,25 @@ class PaymentListResponse(BaseModel):
     total_count: int
 
 
+# --- Investor ---
+
+class InvestorResponse(BaseModel):
+    """Investor aggregate data."""
+    wallet_address: str
+    total_invested_usd: float
+    total_tokens: int
+    payment_count: int
+    extra_data: dict = {}
+    first_invested_at: Optional[datetime] = None
+    last_invested_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+
+
+class InvestorUpdateRequest(BaseModel):
+    """Update the extra_data JSONB field for an investor."""
+    extra_data: dict
+
+
 # --- Error ---
 
 class ErrorResponse(BaseModel):

@@ -4,7 +4,7 @@ from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request, status
 
-from app.models.presale import Payment, PaymentStatus, CreditStatus
+from app.models.presale import Payment, PaymentStatus, CreditStatus, Investor
 from app.schemas.presale import (
     CreateInvoiceRequest,
     CreateInvoiceResponse,
@@ -13,6 +13,8 @@ from app.schemas.presale import (
     AllocationResponse,
     PresaleConfigResponse,
     PresaleStatsResponse,
+    InvestorResponse,
+    InvestorUpdateRequest,
 )
 from app.services.nowpayments import nowpayments_client, NOWPaymentsClient
 from app.services.solana import solana_service
@@ -41,6 +43,27 @@ def _calculate_token_amount(usd_amount: float) -> int:
     price = _get_current_price_usd()
     tokens = usd_amount / price
     return int(tokens * TOKEN_DECIMALS)
+
+
+async def _upsert_investor(payment: Payment) -> None:
+    """Create or update the Investor record after a successful credit."""
+    now = datetime.now(timezone.utc)
+    investor, created = await Investor.get_or_create(
+        wallet_address=payment.wallet_address,
+        defaults={
+            "total_invested_usd": payment.price_amount_usd,
+            "total_tokens": payment.token_amount,
+            "payment_count": 1,
+            "first_invested_at": now,
+            "last_invested_at": now,
+        },
+    )
+    if not created:
+        investor.total_invested_usd += payment.price_amount_usd
+        investor.total_tokens += payment.token_amount
+        investor.payment_count += 1
+        investor.last_invested_at = now
+        await investor.save()
 
 
 # --- Create Invoice ---
@@ -184,6 +207,12 @@ async def ipn_webhook(request: Request):
             payment.credit_tx_signature = tx_sig
             payment.credited_at = datetime.now(timezone.utc)
             logger.info(f"Credited allocation for payment {payment.id}: tx={tx_sig}")
+
+            # Upsert investor record
+            try:
+                await _upsert_investor(payment)
+            except Exception as inv_err:
+                logger.error(f"Failed to upsert investor for {payment.wallet_address}: {inv_err}")
         except Exception as e:
             logger.error(f"Failed to credit allocation for payment {payment.id}: {e}")
             payment.credit_status = CreditStatus.FAILED
@@ -389,3 +418,81 @@ async def get_estimate(usd_amount: float, pay_currency: str = "btc"):
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to get price estimate",
         )
+
+
+# --- Investor endpoints ---
+
+def _investor_to_response(inv: Investor) -> InvestorResponse:
+    return InvestorResponse(
+        wallet_address=inv.wallet_address,
+        total_invested_usd=float(inv.total_invested_usd),
+        total_tokens=inv.total_tokens,
+        payment_count=inv.payment_count,
+        extra_data=inv.extra_data or {},
+        first_invested_at=inv.first_invested_at,
+        last_invested_at=inv.last_invested_at,
+        created_at=inv.created_at,
+    )
+
+
+@router.get(
+    "/investor/{wallet_address}",
+    response_model=InvestorResponse,
+    summary="Get investor profile",
+)
+async def get_investor(wallet_address: str) -> InvestorResponse:
+    """Get investor profile and aggregate data for a wallet."""
+    investor = await Investor.get_or_none(wallet_address=wallet_address)
+    if not investor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Investor not found",
+        )
+    return _investor_to_response(investor)
+
+
+@router.patch(
+    "/investor/{wallet_address}",
+    response_model=InvestorResponse,
+    summary="Update investor profile",
+)
+async def update_investor(
+    wallet_address: str, body: InvestorUpdateRequest
+) -> InvestorResponse:
+    """Update optional profile fields for an investor."""
+    investor = await Investor.get_or_none(wallet_address=wallet_address)
+    if not investor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Investor not found",
+        )
+
+    investor.extra_data = body.extra_data
+    await investor.save()
+
+    return _investor_to_response(investor)
+
+
+@router.get(
+    "/investors",
+    response_model=list[InvestorResponse],
+    summary="List all investors",
+)
+async def list_investors(
+    limit: int = 50,
+    offset: int = 0,
+    order_by: str = "-total_invested_usd",
+) -> list[InvestorResponse]:
+    """List investors ordered by total invested (descending by default)."""
+    allowed_orders = {
+        "total_invested_usd", "-total_invested_usd",
+        "total_tokens", "-total_tokens",
+        "payment_count", "-payment_count",
+        "created_at", "-created_at",
+        "last_invested_at", "-last_invested_at",
+    }
+    if order_by not in allowed_orders:
+        order_by = "-total_invested_usd"
+
+    investors = await Investor.all().order_by(order_by).offset(offset).limit(limit)
+    return [_investor_to_response(inv) for inv in investors]
