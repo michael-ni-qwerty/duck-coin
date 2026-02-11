@@ -1,120 +1,93 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
-from enum import Enum
+from typing import Optional
+from datetime import datetime
 
 
-class BlockchainType(str, Enum):
-    """Supported blockchain types."""
-    SOLANA = "solana"
-    ETHEREUM = "ethereum"
-    TRON = "tron"
-    BSC = "bsc"
-    POLYGON = "polygon"
+# --- Invoice / Payment creation ---
+
+class CreateInvoiceRequest(BaseModel):
+    """Request to create a NOWPayments invoice for token purchase."""
+    wallet_address: str = Field(..., description="Buyer's Solana wallet address (pubkey)")
+    usd_amount: float = Field(..., gt=0, description="Amount in USD to spend")
+    success_url: Optional[str] = Field(None, description="Redirect URL after successful payment")
+    cancel_url: Optional[str] = Field(None, description="Redirect URL if payment cancelled")
 
 
-class PaymentType(str, Enum):
-    """Common payment types across chains."""
-    NATIVE = "NATIVE"  # SOL, ETH, TRX, BNB, MATIC
-    USDT = "USDT"
-    USDC = "USDC"
-    # Solana-specific aliases
-    SOL = "SOL"
+class CreateInvoiceResponse(BaseModel):
+    """Response with NOWPayments invoice details."""
+    payment_id: str = Field(..., description="Internal payment record ID")
+    invoice_url: str = Field(..., description="NOWPayments hosted payment page URL")
+    invoice_id: str = Field(..., description="NOWPayments invoice ID")
+    token_amount: int = Field(..., description="Token amount to be credited (in smallest units)")
+    usd_amount: float
 
 
-class PurchaseRequest(BaseModel):
-    """Request to generate a purchase authorization signature."""
-    chain: BlockchainType = Field(
-        default=BlockchainType.SOLANA,
-        description="Target blockchain"
-    )
-    buyer_wallet: str = Field(..., description="Buyer's wallet address")
-    payment_type: PaymentType = Field(..., description="Payment currency type")
-    payment_amount: int = Field(..., gt=0, description="Payment amount in smallest units")
-    token_amount: int = Field(..., gt=0, description="Token amount to purchase in smallest units")
+# --- Payment status ---
 
-
-class PurchaseAuthorizationResponse(BaseModel):
-    """Response containing the signed authorization for a purchase."""
-    chain: BlockchainType
-    buyer_wallet: str
-    payment_type: str
-    payment_token_address: Optional[str] = Field(None, description="Token contract address (None for native)")
-    payment_amount: int
-    token_amount: int
-    nonce: int
-    signature: str = Field(..., description="Encoded signature (format depends on chain)")
-    message: str = Field(..., description="Encoded message that was signed")
-    signer_public_key: str = Field(..., description="Public key/address of the authorized signer")
-    extra_data: Optional[Dict[str, Any]] = Field(None, description="Chain-specific extra data")
-
-
-class VestingInfoRequest(BaseModel):
-    """Request to get vesting information for a wallet."""
-    chain: BlockchainType = Field(default=BlockchainType.SOLANA, description="Target blockchain")
-    wallet_address: str = Field(..., description="Wallet address to query")
-
-
-class VestingInfoResponse(BaseModel):
-    """Vesting information for a user."""
-    chain: BlockchainType
+class PaymentStatusResponse(BaseModel):
+    """Status of a payment."""
+    payment_id: str
     wallet_address: str
-    total_purchased: int
-    claimed_amount: int
-    vested_amount: int
-    claimable_amount: int
-    vesting_start_time: int
-    cliff_end_time: int
-    vesting_end_time: int
-    vesting_percentage: float = Field(..., ge=0, le=100)
+    usd_amount: float
+    token_amount: int
+    pay_currency: Optional[str] = None
+    payment_status: str
+    credit_status: str
+    credit_tx_signature: Optional[str] = None
+    created_at: datetime
+    paid_at: Optional[datetime] = None
+    credited_at: Optional[datetime] = None
 
+
+# --- Allocation / Vesting ---
+
+class AllocationResponse(BaseModel):
+    """On-chain allocation data for a wallet."""
+    wallet_address: str
+    amount_purchased: int = 0
+    amount_claimed: int = 0
+    claimable_amount: int = 0
+
+
+# --- Presale config & stats ---
 
 class PresaleConfigResponse(BaseModel):
-    """Current presale configuration."""
-    chain: BlockchainType
-    contract_address: str = Field(..., description="Program ID or contract address")
-    presale_token_address: str
-    treasury_address: str
-    payment_tokens: Dict[str, Optional[str]] = Field(
-        ..., 
-        description="Payment token symbols to addresses (None for native)"
-    )
-    token_price_per_unit: int
-    cliff_duration: int
-    vesting_start_time: int
-    vesting_duration: int
-    is_active: bool
+    """Current on-chain presale configuration."""
+    program_id: str
+    token_mint: str
+    token_price_usd: int
+    tge_percentage: int
+    start_time: int
+    daily_cap: int
     total_sold: int
+    presale_supply: int
+    total_burned: int
+    status: str
+    total_raised_usd: int
+    sold_today: int
 
 
 class PresaleStatsResponse(BaseModel):
-    """Presale statistics."""
-    chain: BlockchainType
+    """Aggregate presale statistics."""
     total_sold: int
+    total_raised_usd: int
     total_participants: int
-    total_raised: Dict[str, int] = Field(
-        ...,
-        description="Total raised per payment type"
-    )
+    presale_supply: int
     is_active: bool
 
 
-class DerivedAddressesResponse(BaseModel):
-    """Derived addresses for transaction building (PDAs, contract storage, etc.)."""
-    chain: BlockchainType
-    addresses: Dict[str, Dict[str, Any]] = Field(
-        ...,
-        description="Named addresses with their derivation data"
-    )
+# --- Payments history ---
+
+class PaymentListResponse(BaseModel):
+    """List of payments for a wallet."""
+    wallet_address: str
+    payments: list[PaymentStatusResponse]
+    total_count: int
 
 
-class SupportedChainsResponse(BaseModel):
-    """List of supported blockchains."""
-    chains: list[BlockchainType]
-    default_chain: BlockchainType
-
+# --- Error ---
 
 class ErrorResponse(BaseModel):
     """Standard error response."""
     error: str
     detail: Optional[str] = None
-    chain: Optional[BlockchainType] = None

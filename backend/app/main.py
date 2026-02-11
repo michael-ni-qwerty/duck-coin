@@ -1,47 +1,55 @@
+import asyncio
+import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import register_tortoise
 
 from app.core.config import settings
 from app.api import presale, health
-from app.blockchain.registry import blockchain_registry, register_chains
+from app.services.solana import solana_service
+from app.workers.daily_config import daily_config_loop
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup/shutdown events."""
-    # Startup - register all blockchain implementations
-    register_chains()
+    # Start background workers
+    worker_task = asyncio.create_task(daily_config_loop())
+    logger.info("Started daily config update worker")
     yield
-    # Shutdown - cleanup all blockchain connections
-    await blockchain_registry.disconnect_all()
+    # Shutdown - cancel worker and close connections
+    worker_task.cancel()
+    try:
+        await worker_task
+    except asyncio.CancelledError:
+        pass
+    await solana_service.close()
 
 
 app = FastAPI(
     title=settings.app_name,
     description="""
-    DuckCoin Presale API - Multi-Chain Support
-    
+    DuckCoin Presale API — NOWPayments Integration
+
     This API provides endpoints for:
-    - Generating signed purchase authorizations (multi-chain)
-    - Querying vesting information
+    - Creating payment invoices via NOWPayments (any crypto)
+    - Receiving IPN webhooks and crediting on-chain allocations
+    - Querying payment status and on-chain allocation data
     - Getting presale configuration and statistics
-    
-    ## Supported Blockchains
-    
-    - **Solana**: ed25519 signatures via ed25519_program
-    - **Ethereum** (coming soon): EIP-712 typed data signatures
-    - **Tron** (coming soon): secp256k1 signatures
-    
-    ## Authentication Flow
-    
-    1. Client requests purchase authorization via `/api/v1/presale/authorize-purchase`
-    2. Backend generates unique nonce and signs the authorization
-    3. Client builds chain-specific transaction with signature verification
-    4. Client submits transaction to the blockchain
+
+    ## Payment Flow
+
+    1. Frontend calls `POST /api/v1/presale/create-invoice` with wallet + USD amount
+    2. User is redirected to NOWPayments hosted page to pay with any crypto
+    3. NOWPayments sends IPN webhook to `POST /api/v1/presale/ipn-webhook`
+    4. Backend verifies payment and calls `credit_allocation` on the Solana program
+    5. User's token allocation is recorded on-chain
     """,
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",

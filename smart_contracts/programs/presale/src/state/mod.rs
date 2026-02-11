@@ -4,8 +4,6 @@ use anchor_lang::prelude::*;
 pub struct PresaleConfig {
     pub admin: Pubkey,
     pub token_mint: Pubkey,
-    pub usdc_mint: Pubkey,
-    pub usdt_mint: Pubkey,
     pub token_price_usd: u64,
     pub tge_percentage: u8,
     pub start_time: i64,
@@ -14,9 +12,7 @@ pub struct PresaleConfig {
     pub presale_supply: u64,
     pub total_burned: u64,
     pub status: PresaleStatus,
-    pub total_raised_sol: u64,
-    pub total_raised_usdc: u64,
-    pub total_raised_usdt: u64,
+    pub total_raised_usd: u64,
     pub sold_today: u64,
     pub bump: u8,
 }
@@ -29,7 +25,10 @@ pub enum PresaleStatus {
 }
 
 impl PresaleConfig {
-    pub const LEN: usize = 32 + 32 + 32 + 32 + 8 + 1 + 8 + 8 + 8 + 8 + 8 + 1 + 8 + 8 + 8 + 8 + 1;
+    // admin(32) + token_mint(32) + token_price_usd(8) + tge_percentage(1) + start_time(8)
+    // + daily_cap(8) + total_sold(8) + presale_supply(8) + total_burned(8) + status(1)
+    // + total_raised_usd(8) + sold_today(8) + bump(1)
+    pub const LEN: usize = 32 + 32 + 8 + 1 + 8 + 8 + 8 + 8 + 8 + 1 + 8 + 8 + 1;
 }
 
 #[account]
@@ -40,25 +39,6 @@ pub struct DailyState {
 
 impl DailyState {
     pub const LEN: usize = 8 + 8;
-}
-
-#[account]
-pub struct NonceAccount {
-    pub nonce: u64,
-}
-
-impl NonceAccount {
-    pub const LEN: usize = 8;
-}
-
-#[account]
-pub struct LaunchpoolVault {
-    pub admin: Pubkey,
-    pub bump: u8,
-}
-
-impl LaunchpoolVault {
-    pub const LEN: usize = 32 + 1;
 }
 
 #[account]

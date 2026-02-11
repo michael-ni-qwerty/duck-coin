@@ -1,258 +1,391 @@
-from fastapi import APIRouter, HTTPException, status, Query
+import logging
+import uuid
+from datetime import date, datetime, timezone
 
+from fastapi import APIRouter, HTTPException, Request, status
+
+from app.models.presale import Payment, PaymentStatus, CreditStatus
 from app.schemas.presale import (
-    BlockchainType,
-    PurchaseRequest,
-    PurchaseAuthorizationResponse,
-    VestingInfoRequest,
-    VestingInfoResponse,
+    CreateInvoiceRequest,
+    CreateInvoiceResponse,
+    PaymentStatusResponse,
+    PaymentListResponse,
+    AllocationResponse,
     PresaleConfigResponse,
     PresaleStatsResponse,
-    DerivedAddressesResponse,
-    SupportedChainsResponse,
 )
-from app.blockchain import blockchain_registry, BlockchainType as ChainType
+from app.services.nowpayments import nowpayments_client, NOWPaymentsClient
+from app.services.solana import solana_service
+from app.core.config import settings
+from app.core.constants import TOKEN_DECIMALS
+from app.workers.tokenomics import SCHEDULE, TOTAL_DAYS, PRICE_PRECISION
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/presale", tags=["presale"])
 
 
-def _map_chain_type(schema_chain: BlockchainType) -> ChainType:
-    """Map schema BlockchainType to blockchain module BlockchainType."""
-    return ChainType(schema_chain.value)
+def _get_current_price_usd() -> float:
+    """Return the current token price in USD based on the tokenomics schedule."""
+    if not settings.presale_start_date:
+        return SCHEDULE[1].price_usd / PRICE_PRECISION
+    start = date.fromisoformat(settings.presale_start_date)
+    today = datetime.now(timezone.utc).date()
+    day = (today - start).days + 1
+    day = max(1, min(day, TOTAL_DAYS))
+    return SCHEDULE[day].price_usd / PRICE_PRECISION
 
 
-def _get_services(chain: BlockchainType):
-    """Get blockchain services for the specified chain."""
-    chain_type = _map_chain_type(chain)
-    if not blockchain_registry.is_registered(chain_type):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Blockchain {chain.value} is not supported"
-        )
-    return (
-        blockchain_registry.get_blockchain_service(chain_type),
-        blockchain_registry.get_signature_service(chain_type),
-        blockchain_registry.get_nonce_service(chain_type),
-    )
+def _calculate_token_amount(usd_amount: float) -> int:
+    """Calculate token amount (in smallest units) for a given USD amount."""
+    price = _get_current_price_usd()
+    tokens = usd_amount / price
+    return int(tokens * TOKEN_DECIMALS)
 
 
-@router.get(
-    "/supported-chains",
-    response_model=SupportedChainsResponse,
-    summary="Get supported blockchains",
-    description="Returns list of supported blockchains for the presale."
-)
-async def get_supported_chains() -> SupportedChainsResponse:
-    """Get list of supported blockchains."""
-    supported = blockchain_registry.get_supported_chains()
-    return SupportedChainsResponse(
-        chains=[BlockchainType(c.value) for c in supported],
-        default_chain=BlockchainType.SOLANA,
-    )
-
+# --- Create Invoice ---
 
 @router.post(
-    "/authorize-purchase",
-    response_model=PurchaseAuthorizationResponse,
-    summary="Generate purchase authorization signature",
-    description="""
-    Generates a signature authorizing a token purchase on the specified blockchain.
-    
-    The signature scheme depends on the blockchain:
-    - Solana: ed25519 signature verified via ed25519_program
-    - Ethereum/BSC/Polygon: EIP-712 typed data signature
-    - Tron: secp256k1 signature
-    
-    Flow:
-    1. Client calls this endpoint with purchase details and target chain
-    2. Backend generates unique nonce and signs the authorization
-    3. Client builds chain-specific transaction with signature verification
-    4. Client submits transaction to the blockchain
-    """
+    "/create-invoice",
+    response_model=CreateInvoiceResponse,
+    summary="Create a payment invoice",
+    description="Creates a NOWPayments invoice. User is redirected to the hosted payment page to pay with any supported crypto.",
 )
-async def authorize_purchase(request: PurchaseRequest) -> PurchaseAuthorizationResponse:
-    """Generate a signed purchase authorization."""
-    
-    # Get services for the target chain
-    blockchain_service, signature_service, nonce_service = _get_services(request.chain)
-    
-    # Generate unique nonce
-    nonce = await nonce_service.generate_nonce(request.buyer_wallet)
-    
-    # Verify nonce is available
-    is_available = await nonce_service.is_nonce_available(request.buyer_wallet, nonce)
-    if not is_available:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Nonce collision - please retry"
-        )
-    
-    # Normalize payment type (SOL -> NATIVE for consistency)
-    payment_type = request.payment_type.value
-    if payment_type == "SOL":
-        payment_type = "SOL"  # Keep SOL for Solana compatibility
-    
-    # Generate signed authorization
-    try:
-        authorization = signature_service.generate_purchase_authorization(
-            buyer_address=request.buyer_wallet,
-            payment_type=payment_type,
-            payment_amount=request.payment_amount,
-            token_amount=request.token_amount,
-            nonce=nonce,
-        )
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Signature generation failed: {str(e)}"
-        )
-    
-    return PurchaseAuthorizationResponse(
-        chain=request.chain,
-        buyer_wallet=authorization.buyer_address,
-        payment_type=authorization.payment_type,
-        payment_token_address=authorization.payment_token_address,
-        payment_amount=authorization.payment_amount,
-        token_amount=authorization.token_amount,
-        nonce=authorization.nonce,
-        signature=authorization.signature,
-        message=authorization.message,
-        signer_public_key=authorization.signer_public_key,
-        extra_data=authorization.extra_data,
+async def create_invoice(request: CreateInvoiceRequest) -> CreateInvoiceResponse:
+    """Create a NOWPayments invoice for token purchase."""
+
+    token_amount = _calculate_token_amount(request.usd_amount)
+    order_id = str(uuid.uuid4())
+
+    # Create DB record first
+    payment = await Payment.create(
+        wallet_address=request.wallet_address,
+        nowpayments_order_id=order_id,
+        price_amount_usd=request.usd_amount,
+        token_amount=token_amount,
+        payment_status=PaymentStatus.WAITING,
+        credit_status=CreditStatus.PENDING,
     )
 
+    # Create NOWPayments invoice
+    try:
+        invoice = await nowpayments_client.create_invoice(
+            price_amount=request.usd_amount,
+            price_currency="usd",
+            order_id=order_id,
+            order_description=f"DuckCoin Presale - {token_amount / TOKEN_DECIMALS:.0f} DUCK tokens",
+            ipn_callback_url=f"{settings.api_v1_prefix}/presale/ipn-webhook",
+            success_url=request.success_url,
+            cancel_url=request.cancel_url,
+        )
+    except Exception as e:
+        logger.error(f"Failed to create NOWPayments invoice: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to create payment invoice",
+        )
+
+    # Update payment record with invoice ID
+    invoice_id = str(invoice.get("id", ""))
+    payment.nowpayments_invoice_id = invoice_id
+    await payment.save()
+
+    invoice_url = invoice.get("invoice_url", "")
+
+    return CreateInvoiceResponse(
+        payment_id=str(payment.id),
+        invoice_url=invoice_url,
+        invoice_id=invoice_id,
+        token_amount=token_amount,
+        usd_amount=request.usd_amount,
+    )
+
+
+# --- IPN Webhook ---
+
+@router.post(
+    "/ipn-webhook",
+    summary="NOWPayments IPN webhook",
+    description="Receives payment status updates from NOWPayments. Verifies HMAC signature and credits allocation on-chain.",
+    include_in_schema=False,
+)
+async def ipn_webhook(request: Request):
+    """Handle NOWPayments IPN (Instant Payment Notification) callback."""
+
+    body = await request.body()
+
+    # Verify HMAC signature
+    sig = request.headers.get("x-nowpayments-sig", "")
+    if not NOWPaymentsClient.verify_ipn_signature(body, sig):
+        logger.warning("IPN signature verification failed")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid signature")
+
+    import json
+    payload = json.loads(body)
+    logger.info(f"IPN received: {payload}")
+
+    payment_id = payload.get("payment_id")
+    payment_status_str = payload.get("payment_status", "")
+    order_id = payload.get("order_id")
+    pay_amount = payload.get("pay_amount")
+    pay_currency = payload.get("pay_currency")
+    actually_paid = payload.get("actually_paid")
+
+    if not order_id:
+        logger.warning("IPN missing order_id")
+        return {"status": "ignored"}
+
+    # Find payment record
+    payment = await Payment.filter(nowpayments_order_id=order_id).first()
+    if not payment:
+        logger.warning(f"IPN for unknown order_id: {order_id}")
+        return {"status": "ignored"}
+
+    # Update payment info
+    if payment_id:
+        payment.nowpayments_payment_id = int(payment_id)
+    if pay_amount:
+        payment.pay_amount = pay_amount
+    if pay_currency:
+        payment.pay_currency = pay_currency
+    if actually_paid:
+        payment.actually_paid = actually_paid
+
+    # Map NOWPayments status
+    status_map = {
+        "waiting": PaymentStatus.WAITING,
+        "confirming": PaymentStatus.CONFIRMING,
+        "confirmed": PaymentStatus.CONFIRMED,
+        "sending": PaymentStatus.SENDING,
+        "partially_paid": PaymentStatus.PARTIALLY_PAID,
+        "finished": PaymentStatus.FINISHED,
+        "failed": PaymentStatus.FAILED,
+        "refunded": PaymentStatus.REFUNDED,
+        "expired": PaymentStatus.EXPIRED,
+    }
+    new_status = status_map.get(payment_status_str)
+    if new_status:
+        payment.payment_status = new_status
+
+    # Credit on-chain when payment is finished
+    if new_status == PaymentStatus.FINISHED and payment.credit_status == CreditStatus.PENDING:
+        payment.paid_at = datetime.now(timezone.utc)
+        await payment.save()
+
+        try:
+            usd_amount_raw = int(float(payment.price_amount_usd) * 10**6)  # 6 decimal precision
+            tx_sig = await solana_service.credit_allocation(
+                user_pubkey_str=payment.wallet_address,
+                token_amount=payment.token_amount,
+                usd_amount=usd_amount_raw,
+                payment_id=str(payment.id),
+            )
+            payment.credit_status = CreditStatus.CREDITED
+            payment.credit_tx_signature = tx_sig
+            payment.credited_at = datetime.now(timezone.utc)
+            logger.info(f"Credited allocation for payment {payment.id}: tx={tx_sig}")
+        except Exception as e:
+            logger.error(f"Failed to credit allocation for payment {payment.id}: {e}")
+            payment.credit_status = CreditStatus.FAILED
+            payment.credit_error = str(e)
+
+    await payment.save()
+    return {"status": "ok"}
+
+
+# --- Payment Status ---
+
+@router.get(
+    "/payment/{payment_id}",
+    response_model=PaymentStatusResponse,
+    summary="Get payment status",
+)
+async def get_payment_status(payment_id: str) -> PaymentStatusResponse:
+    """Get the status of a specific payment."""
+    payment = await Payment.get_or_none(id=payment_id)
+    if not payment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
+
+    return PaymentStatusResponse(
+        payment_id=str(payment.id),
+        wallet_address=payment.wallet_address,
+        usd_amount=float(payment.price_amount_usd),
+        token_amount=payment.token_amount,
+        pay_currency=payment.pay_currency,
+        payment_status=payment.payment_status.value,
+        credit_status=payment.credit_status.value,
+        credit_tx_signature=payment.credit_tx_signature,
+        created_at=payment.created_at,
+        paid_at=payment.paid_at,
+        credited_at=payment.credited_at,
+    )
+
+
+# --- Payments by wallet ---
+
+@router.get(
+    "/payments/{wallet_address}",
+    response_model=PaymentListResponse,
+    summary="Get payments for a wallet",
+)
+async def get_wallet_payments(wallet_address: str) -> PaymentListResponse:
+    """Get all payments for a specific wallet address."""
+    payments = await Payment.filter(wallet_address=wallet_address).order_by("-created_at")
+
+    items = [
+        PaymentStatusResponse(
+            payment_id=str(p.id),
+            wallet_address=p.wallet_address,
+            usd_amount=float(p.price_amount_usd),
+            token_amount=p.token_amount,
+            pay_currency=p.pay_currency,
+            payment_status=p.payment_status.value,
+            credit_status=p.credit_status.value,
+            credit_tx_signature=p.credit_tx_signature,
+            created_at=p.created_at,
+            paid_at=p.paid_at,
+            credited_at=p.credited_at,
+        )
+        for p in payments
+    ]
+
+    return PaymentListResponse(
+        wallet_address=wallet_address,
+        payments=items,
+        total_count=len(items),
+    )
+
+
+# --- On-chain allocation ---
+
+@router.get(
+    "/allocation/{wallet_address}",
+    response_model=AllocationResponse,
+    summary="Get on-chain allocation for a wallet",
+)
+async def get_allocation(wallet_address: str) -> AllocationResponse:
+    """Get the on-chain token allocation for a wallet."""
+    data = await solana_service.get_allocation_data(wallet_address)
+
+    if data is None:
+        return AllocationResponse(wallet_address=wallet_address)
+
+    return AllocationResponse(
+        wallet_address=wallet_address,
+        amount_purchased=data["amount_purchased"],
+        amount_claimed=data["amount_claimed"],
+        claimable_amount=data["claimable_amount"],
+    )
+
+
+# --- Presale config ---
 
 @router.get(
     "/config",
     response_model=PresaleConfigResponse,
-    summary="Get presale configuration",
-    description="Returns the current presale configuration including token addresses and vesting parameters."
+    summary="Get on-chain presale configuration",
 )
-async def get_presale_config(
-    chain: BlockchainType = Query(default=BlockchainType.SOLANA, description="Target blockchain")
-) -> PresaleConfigResponse:
-    """Get current presale configuration for a specific chain."""
-    
-    blockchain_service, _, _ = _get_services(chain)
-    
-    config = await blockchain_service.get_presale_config()
+async def get_presale_config() -> PresaleConfigResponse:
+    """Get the current presale configuration from on-chain."""
+    config = await solana_service.get_config_data()
     if config is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Presale config not found"
+            detail="Presale config not found on-chain",
         )
-    
+
     return PresaleConfigResponse(
-        chain=chain,
-        contract_address=config.program_id,
-        presale_token_address=config.presale_token_address,
-        treasury_address=config.treasury_address,
-        payment_tokens=config.payment_tokens,
-        token_price_per_unit=config.token_price_per_unit,
-        cliff_duration=config.cliff_duration,
-        vesting_start_time=config.vesting_start_time,
-        vesting_duration=config.vesting_duration,
-        is_active=config.is_active,
-        total_sold=config.total_sold,
+        program_id=settings.presale_program_id,
+        token_mint=config["token_mint"],
+        token_price_usd=config["token_price_usd"],
+        tge_percentage=config["tge_percentage"],
+        start_time=config["start_time"],
+        daily_cap=config["daily_cap"],
+        total_sold=config["total_sold"],
+        presale_supply=config["presale_supply"],
+        total_burned=config["total_burned"],
+        status=config["status"],
+        total_raised_usd=config["total_raised_usd"],
+        sold_today=config["sold_today"],
     )
 
 
-@router.post(
-    "/vesting-info",
-    response_model=VestingInfoResponse,
-    summary="Get vesting information for a wallet",
-    description="Returns the vesting schedule and claimable tokens for a specific wallet."
-)
-async def get_vesting_info(request: VestingInfoRequest) -> VestingInfoResponse:
-    """Get vesting information for a wallet."""
-    
-    blockchain_service, _, _ = _get_services(request.chain)
-    
-    vesting_info = await blockchain_service.get_vesting_info(request.wallet_address)
-    
-    if vesting_info is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch vesting information"
-        )
-    
-    return VestingInfoResponse(
-        chain=request.chain,
-        wallet_address=vesting_info.wallet_address,
-        total_purchased=vesting_info.total_purchased,
-        claimed_amount=vesting_info.claimed_amount,
-        vested_amount=vesting_info.vested_amount,
-        claimable_amount=vesting_info.claimable_amount,
-        vesting_start_time=vesting_info.vesting_start_time,
-        cliff_end_time=vesting_info.cliff_end_time,
-        vesting_end_time=vesting_info.vesting_end_time,
-        vesting_percentage=vesting_info.vesting_percentage,
-    )
-
+# --- Presale stats ---
 
 @router.get(
     "/stats",
     response_model=PresaleStatsResponse,
     summary="Get presale statistics",
-    description="Returns overall presale statistics including total sold and raised amounts."
 )
-async def get_presale_stats(
-    chain: BlockchainType = Query(default=BlockchainType.SOLANA, description="Target blockchain")
-) -> PresaleStatsResponse:
-    """Get presale statistics for a specific chain."""
-    
-    # In production, this would aggregate from on-chain data and/or database
-    return PresaleStatsResponse(
-        chain=chain,
-        total_sold=0,
-        total_participants=0,
-        total_raised={"NATIVE": 0, "USDT": 0, "USDC": 0},
-        is_active=True,
-    )
+async def get_presale_stats() -> PresaleStatsResponse:
+    """Get aggregate presale statistics from on-chain + DB."""
+    config = await solana_service.get_config_data()
 
+    total_participants = await Payment.filter(
+        credit_status=CreditStatus.CREDITED
+    ).distinct().values_list("wallet_address", flat=True)
 
-@router.get(
-    "/payment-tokens",
-    summary="Get accepted payment tokens",
-    description="Returns the token addresses for accepted payment methods on a specific chain."
-)
-async def get_payment_tokens(
-    chain: BlockchainType = Query(default=BlockchainType.SOLANA, description="Target blockchain")
-):
-    """Get accepted payment token addresses for a chain."""
-    
-    blockchain_service, _, _ = _get_services(chain)
-    config = await blockchain_service.get_presale_config()
-    
-    if config is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Presale config not found"
+    if config:
+        return PresaleStatsResponse(
+            total_sold=config["total_sold"],
+            total_raised_usd=config["total_raised_usd"],
+            total_participants=len(set(total_participants)),
+            presale_supply=config["presale_supply"],
+            is_active=config["status"] == "PresaleActive",
         )
-    
-    return {
-        "chain": chain.value,
-        "tokens": config.payment_tokens,
-    }
 
+    return PresaleStatsResponse(
+        total_sold=0,
+        total_raised_usd=0,
+        total_participants=0,
+        presale_supply=0,
+        is_active=False,
+    )
+
+
+# --- Available currencies ---
 
 @router.get(
-    "/derived-addresses/{wallet_address}",
-    response_model=DerivedAddressesResponse,
-    summary="Get derived addresses for a wallet",
-    description="Returns derived addresses (PDAs, storage slots, etc.) for client-side transaction building."
+    "/currencies",
+    summary="Get available payment currencies",
 )
-async def get_derived_addresses(
-    wallet_address: str,
-    chain: BlockchainType = Query(default=BlockchainType.SOLANA, description="Target blockchain")
-) -> DerivedAddressesResponse:
-    """Get derived addresses for transaction building."""
-    
-    blockchain_service, _, _ = _get_services(chain)
-    
-    addresses = blockchain_service.get_pda_addresses(wallet_address)
-    
-    return DerivedAddressesResponse(
-        chain=chain,
-        addresses=addresses,
-    )
+async def get_currencies():
+    """Get list of cryptocurrencies available for payment via NOWPayments."""
+    try:
+        currencies = await nowpayments_client.get_available_currencies()
+        return {"currencies": currencies}
+    except Exception as e:
+        logger.error(f"Failed to fetch currencies: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to fetch available currencies",
+        )
+
+
+# --- Price estimate ---
+
+@router.get(
+    "/estimate",
+    summary="Get estimated crypto price for USD amount",
+)
+async def get_estimate(usd_amount: float, pay_currency: str = "btc"):
+    """Get estimated amount in a specific crypto for a given USD amount."""
+    try:
+        estimate = await nowpayments_client.get_estimated_price(
+            amount=usd_amount,
+            currency_from="usd",
+            currency_to=pay_currency,
+        )
+        token_amount = _calculate_token_amount(usd_amount)
+        return {
+            "usd_amount": usd_amount,
+            "pay_currency": pay_currency,
+            "estimated_amount": estimate.get("estimated_amount"),
+            "token_amount": token_amount,
+        }
+    except Exception as e:
+        logger.error(f"Failed to get estimate: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to get price estimate",
+        )

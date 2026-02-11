@@ -26,20 +26,8 @@ pub enum PresaleError {
     SupplyCannotIncrease,
     #[msg("Supply cannot be lower than total tokens already sold")]
     SupplyBelowTotalSold,
-    #[msg("Backend authorization message expired")]
-    MessageExpired,
-    #[msg("Invalid backend public key")]
-    InvalidBackendKey,
-    #[msg("Invalid backend signature")]
-    InvalidSignature,
-    #[msg("Invalid authorization message")]
-    InvalidAuthMessage,
-    #[msg("Missing Ed25519 verification instruction")]
-    InvalidEd25519Program,
     #[msg("Config can only be updated once per day (on a new day)")]
     UpdateConfigOnlyOnNewDay,
     #[msg("Presale has not ended yet")]
     PresaleNotEnded,
-    #[msg("Invalid oracle price")]
-    InvalidPrice,
 }

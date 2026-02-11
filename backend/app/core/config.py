@@ -8,25 +8,25 @@ class Settings(BaseSettings):
     app_name: str = "DuckCoin Presale API"
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
-    
-    # Solana Configuration
+
+    # Solana Configuration (for on-chain credit_allocation calls)
     solana_rpc_url: str = "https://api.devnet.solana.com"
     presale_program_id: str = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
-    
-    # Token Mints
     presale_token_mint: str = ""
-    usdt_mint: str = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
-    usdc_mint: str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-    
-    # Treasury
-    treasury_wallet: str = ""
-    
-    # Authorized Signer (Base58 encoded private key)
-    authorized_signer_private_key: str = ""
-    
+    # Admin keypair (Base58 encoded) — signs credit_allocation transactions
+    admin_private_key: str = ""
+    # Presale start date (ISO format, e.g. "2026-03-01") — day 1 of the tokenomics schedule
+    presale_start_date: str = ""
+
+    # NOWPayments Configuration
+    nowpayments_api_key: str = ""
+    nowpayments_ipn_secret: str = ""
+    nowpayments_api_url: str = "https://api.nowpayments.io/v1"
+    nowpayments_sandbox: bool = False
+
     # Database (Tortoise ORM format)
     database_url: str = "postgres://user:password@localhost:5432/duckcoin"
-    
+
     @property
     def tortoise_config(self) -> dict:
         """Tortoise ORM configuration."""
@@ -41,22 +41,14 @@ class Settings(BaseSettings):
                 },
             },
         }
-    
-    # Redis
-    redis_url: str = "redis://localhost:6379/0"
-    
-    # JWT Settings
-    jwt_secret_key: str = "your-super-secret-jwt-key-change-in-production"
-    jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 30
-    
+
     # CORS
     cors_origins: str = '["http://localhost:3000","http://localhost:8080"]'
-    
+
     @property
     def cors_origins_list(self) -> List[str]:
         return json.loads(self.cors_origins)
-    
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

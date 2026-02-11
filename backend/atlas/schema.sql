@@ -1,82 +1,56 @@
 -- DuckCoin Database Schema
 -- This file is the source of truth for Atlas migrations
+-- Updated for NOWPayments integration (Solana-only)
 
--- Blockchains table
-CREATE TABLE IF NOT EXISTS blockchains (
+-- Payments table: tracks NOWPayments invoices and on-chain credit status
+CREATE TABLE IF NOT EXISTS payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(50) NOT NULL UNIQUE,
-    symbol VARCHAR(10) NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT true,
-    extra_data JSONB,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
 
--- Tokens table
-CREATE TABLE IF NOT EXISTS tokens (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    blockchain_id UUID NOT NULL REFERENCES blockchains(id),
-    address VARCHAR(128), -- NULL for native tokens
-    symbol VARCHAR(20) NOT NULL,
-    decimals INTEGER NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT true,
-    extra_data JSONB,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(blockchain_id, address)
-);
+    -- User info
+    wallet_address VARCHAR(128) NOT NULL,
 
--- Addresses table
-CREATE TABLE IF NOT EXISTS addresses (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    blockchain_id UUID NOT NULL REFERENCES blockchains(id),
-    address VARCHAR(128) NOT NULL,
-    label VARCHAR(100),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(blockchain_id, address)
-);
+    -- NOWPayments data
+    nowpayments_invoice_id VARCHAR(64),
+    nowpayments_payment_id BIGINT UNIQUE,
+    nowpayments_order_id VARCHAR(128),
 
--- Transactions table (formerly purchases)
-CREATE TABLE IF NOT EXISTS transactions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    
-    -- Transaction type: 'payment', 'transfer', etc.
-    type VARCHAR(20) NOT NULL DEFAULT 'payment',
-    
-    -- Blockchain and Token info
-    blockchain_id UUID NOT NULL REFERENCES blockchains(id),
-    token_id UUID REFERENCES tokens(id), -- NULL if native
-    
-    -- Wallet info
-    from_address_id VARCHAR(128),
-    to_address_id VARCHAR(128),
-    
-    -- Details
-    amount BIGINT NOT NULL,
-    tx_hash VARCHAR(128),
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    
-    -- Metadata (can be used for purchase specific details)
-    metadata JSONB,
-    
+    -- Amounts
+    price_amount_usd NUMERIC(18, 2) NOT NULL,
+    token_amount BIGINT NOT NULL,
+    pay_amount NUMERIC(28, 12),
+    pay_currency VARCHAR(20),
+    actually_paid NUMERIC(28, 12),
+
+    -- Status
+    payment_status VARCHAR(20) NOT NULL DEFAULT 'waiting',
+    credit_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+
+    -- On-chain credit
+    credit_tx_signature VARCHAR(128),
+    credit_error TEXT,
+
     -- Timestamps
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    confirmed_at TIMESTAMPTZ
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    paid_at TIMESTAMPTZ,
+    credited_at TIMESTAMPTZ
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_transactions_blockchain_id ON transactions(blockchain_id);
-CREATE INDEX IF NOT EXISTS idx_transactions_token_id ON transactions(token_id);
-CREATE INDEX IF NOT EXISTS idx_transactions_from_address_id ON transactions(from_address_id);
-CREATE INDEX IF NOT EXISTS idx_transactions_tx_hash ON transactions(tx_hash);
-CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
-CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type);
+CREATE INDEX IF NOT EXISTS idx_payments_wallet_address ON payments(wallet_address);
+CREATE INDEX IF NOT EXISTS idx_payments_invoice_id ON payments(nowpayments_invoice_id);
+CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(nowpayments_order_id);
+CREATE INDEX IF NOT EXISTS idx_payments_payment_status ON payments(payment_status);
+CREATE INDEX IF NOT EXISTS idx_payments_credit_status ON payments(credit_status);
 
 -- Constraints
-ALTER TABLE transactions DROP CONSTRAINT IF EXISTS chk_transactions_status;
-ALTER TABLE transactions ADD CONSTRAINT chk_transactions_status 
-    CHECK (status IN ('pending', 'confirmed', 'failed'));
+ALTER TABLE payments DROP CONSTRAINT IF EXISTS chk_payment_status;
+ALTER TABLE payments ADD CONSTRAINT chk_payment_status
+    CHECK (payment_status IN (
+        'waiting', 'confirming', 'confirmed', 'sending',
+        'partially_paid', 'finished', 'failed', 'refunded', 'expired'
+    ));
 
-ALTER TABLE transactions DROP CONSTRAINT IF EXISTS chk_transactions_type;
-ALTER TABLE transactions ADD CONSTRAINT chk_transactions_type 
-    CHECK (type IN ('payment'));
+ALTER TABLE payments DROP CONSTRAINT IF EXISTS chk_credit_status;
+ALTER TABLE payments ADD CONSTRAINT chk_credit_status
+    CHECK (credit_status IN ('pending', 'credited', 'failed'));
