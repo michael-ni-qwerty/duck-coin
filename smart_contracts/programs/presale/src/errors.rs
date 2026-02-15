@@ -30,4 +30,8 @@ pub enum PresaleError {
     UpdateConfigOnlyOnNewDay,
     #[msg("Presale has not ended yet")]
     PresaleNotEnded,
+    #[msg("Unlock percentage cannot exceed 100")]
+    UnlockExceedsMax,
+    #[msg("Unlock percentage cannot decrease")]
+    UnlockCannotDecrease,
 }

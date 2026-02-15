@@ -29,9 +29,13 @@ pub fn credit_allocation(
     let allocation = &mut ctx.accounts.user_allocation;
     allocation.amount_purchased += token_amount;
 
-    // Calculate and update claimable amount based on TGE percentage
+    // TGE portion → immediately claimable after token launch
     let tge_claimable = (token_amount * config.tge_percentage as u64) / 100;
     allocation.claimable_amount += tge_claimable;
+
+    // Remaining portion → locked, released via admin global unlock
+    let vesting_amount = token_amount - tge_claimable;
+    allocation.amount_vesting += vesting_amount;
 
     // 5. Update global state
     ctx.accounts.daily_state.sold_today += token_amount;

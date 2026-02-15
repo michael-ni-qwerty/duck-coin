@@ -1,0 +1,5 @@
+# Backend dependencies
+-r backend/requirements.in
+
+# Solana / Anchor interaction scripts
+anchorpy>=0.20.1

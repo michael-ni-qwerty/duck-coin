@@ -126,3 +126,5 @@ backend/atlas/schema_current.sql
 .cache/
 tmp/
 temp/
+
+qwerty.txt

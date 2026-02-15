@@ -9,6 +9,15 @@ pub fn claim(ctx: Context<Claim>) -> Result<()> {
     require!(config.status == PresaleStatus::TokenLaunched, PresaleError::NotLaunched);
 
     let allocation = &mut ctx.accounts.user_allocation;
+
+    // Apply any new global unlock of the vesting (non-TGE) portion
+    if config.global_unlock_pct > allocation.last_unlock_pct {
+        let new_pct = (config.global_unlock_pct - allocation.last_unlock_pct) as u64;
+        let newly_unlocked = (allocation.amount_vesting * new_pct) / 100;
+        allocation.claimable_amount += newly_unlocked;
+        allocation.last_unlock_pct = config.global_unlock_pct;
+    }
+
     let amount_to_claim = allocation.claimable_amount;
 
     require!(amount_to_claim > 0, PresaleError::NothingToClaim);

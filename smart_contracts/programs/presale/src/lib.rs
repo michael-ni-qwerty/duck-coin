@@ -41,6 +41,10 @@ pub mod presale {
     pub fn claim(ctx: Context<Claim>) -> Result<()> {
         instructions::claim(ctx)
     }
+
+    pub fn set_unlock(ctx: Context<SetUnlock>, unlock_pct: u8) -> Result<()> {
+        instructions::set_unlock(ctx, unlock_pct)
+    }
 }
 
 #[event]
@@ -62,4 +66,9 @@ pub struct ConfigUpdateEvent {
     pub new_price: u64,
     pub new_tge: u8,
     pub new_daily_cap: u64,
+}
+
+#[event]
+pub struct UnlockEvent {
+    pub new_unlock_pct: u8,
 }
