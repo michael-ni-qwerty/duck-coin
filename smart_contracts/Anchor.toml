@@ -6,18 +6,18 @@ skip-lint = false
 anchor_version = "0.32.1"
 
 [programs.localnet]
-presale = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+presale = "J6uoJoaYaytU2PRedpzszvMZMmF4aNvAzHeqgtxQu1nN"
 
 [programs.devnet]
-presale = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+presale = "J6uoJoaYaytU2PRedpzszvMZMmF4aNvAzHeqgtxQu1nN"
 
 [programs.mainnet]
-presale = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+presale = "J6uoJoaYaytU2PRedpzszvMZMmF4aNvAzHeqgtxQu1nN"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 

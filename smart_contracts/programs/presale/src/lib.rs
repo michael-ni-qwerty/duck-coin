@@ -7,7 +7,7 @@ pub mod errors;
 pub mod instructions;
 pub mod state;
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("J6uoJoaYaytU2PRedpzszvMZMmF4aNvAzHeqgtxQu1nN");
 
 #[program]
 pub mod presale {

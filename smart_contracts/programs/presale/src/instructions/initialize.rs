@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token::{Mint, Token, TokenAccount};
 use crate::state::*;
 use crate::constants::*;
 
@@ -9,10 +10,10 @@ pub fn initialize(
     let config = &mut ctx.accounts.config;
     config.admin = ctx.accounts.admin.key();
     config.token_mint = ctx.accounts.token_mint.key();
-    config.token_price_usd = 5 * 10u64.pow(7); // 5 cents per token in USD
+    config.token_price_usd = 5u64.checked_mul(10u64.pow(7)).unwrap(); // 5 cents per token in USD
     config.tge_percentage = 50;
-    config.daily_cap = 30_000_000 * 10u64.pow(9);
-    config.presale_supply = 2_400_000_000 * 10u64.pow(9);
+    config.daily_cap = 30_000_000u64.checked_mul(10u64.pow(9)).unwrap();
+    config.presale_supply = 2_400_000_000u64.checked_mul(10u64.pow(9)).unwrap();
     config.start_time = start_time;
     config.total_sold = 0;
     config.total_burned = 0;
@@ -37,7 +38,20 @@ pub struct Initialize<'info> {
     pub daily_state: Account<'info, DailyState>,
     #[account(mut)]
     pub admin: Signer<'info>,
-    /// CHECK: Token mint for the presale token (stored in config for reference)
-    pub token_mint: AccountInfo<'info>,
+    
+    pub token_mint: Account<'info, Mint>,
+    
+    #[account(
+        init,
+        payer = admin,
+        seeds = [SEED_VAULT, config.key().as_ref()],
+        bump,
+        token::mint = token_mint,
+        token::authority = vault_token_account,
+    )]
+    pub vault_token_account: Account<'info, TokenAccount>,
+    
     pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    pub rent: Sysvar<'info, Rent>,
 }

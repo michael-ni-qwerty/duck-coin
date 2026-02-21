@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     nowpayments_api_url: str = "https://api.nowpayments.io/v1"
     nowpayments_sandbox: bool = False
 
+    # Invoice anti-abuse guardrails
+    invoice_rate_limit_window_seconds: int = 60
+    invoice_rate_limit_max_per_window: int = 5
+    invoice_max_active_per_wallet: int = 3
+    invoice_active_window_hours: int = 24
+
     # Database (Tortoise ORM format)
     database_url: str = "postgres://user:password@localhost:5432/duckcoin"
 

@@ -13,8 +13,8 @@ pub fn claim(ctx: Context<Claim>) -> Result<()> {
     // Apply any new global unlock of the vesting (non-TGE) portion
     if config.global_unlock_pct > allocation.last_unlock_pct {
         let new_pct = (config.global_unlock_pct - allocation.last_unlock_pct) as u64;
-        let newly_unlocked = (allocation.amount_vesting * new_pct) / 100;
-        allocation.claimable_amount += newly_unlocked;
+        let newly_unlocked = allocation.amount_vesting.checked_mul(new_pct).unwrap().checked_div(100).unwrap();
+        allocation.claimable_amount = allocation.claimable_amount.checked_add(newly_unlocked).unwrap();
         allocation.last_unlock_pct = config.global_unlock_pct;
     }
 

@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request, status
 
@@ -77,6 +77,38 @@ async def _upsert_investor(payment: Payment) -> None:
 async def create_invoice(request: CreateInvoiceRequest) -> CreateInvoiceResponse:
     """Create a NOWPayments invoice for token purchase."""
 
+    now = datetime.now(timezone.utc)
+    active_statuses = [
+        PaymentStatus.WAITING,
+        PaymentStatus.CONFIRMING,
+        PaymentStatus.CONFIRMED,
+        PaymentStatus.SENDING,
+        PaymentStatus.PARTIALLY_PAID,
+    ]
+
+    rate_window_start = now - timedelta(seconds=settings.invoice_rate_limit_window_seconds)
+    recent_invoice_count = await Payment.filter(
+        wallet_address=request.wallet_address,
+        created_at__gte=rate_window_start,
+    ).count()
+    if recent_invoice_count >= settings.invoice_rate_limit_max_per_window:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many invoice requests. Please try again later.",
+        )
+
+    active_window_start = now - timedelta(hours=settings.invoice_active_window_hours)
+    active_invoice_count = await Payment.filter(
+        wallet_address=request.wallet_address,
+        payment_status__in=active_statuses,
+        created_at__gte=active_window_start,
+    ).count()
+    if active_invoice_count >= settings.invoice_max_active_per_wallet:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many active invoices for this wallet. Complete or wait for existing invoices first.",
+        )
+
     token_amount = _calculate_token_amount(request.usd_amount)
     order_id = str(uuid.uuid4())
 
@@ -103,6 +135,8 @@ async def create_invoice(request: CreateInvoiceRequest) -> CreateInvoiceResponse
         )
     except Exception as e:
         logger.error(f"Failed to create NOWPayments invoice: {e}")
+        payment.payment_status = PaymentStatus.FAILED
+        await payment.save()
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to create payment invoice",

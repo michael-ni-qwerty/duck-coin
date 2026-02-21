@@ -8,7 +8,7 @@ from datetime import datetime
 class CreateInvoiceRequest(BaseModel):
     """Request to create a NOWPayments invoice for token purchase."""
     wallet_address: str = Field(..., description="Buyer's Solana wallet address (pubkey)")
-    usd_amount: float = Field(..., gt=0, description="Amount in USD to spend")
+    usd_amount: float = Field(..., ge=50, description="Amount in USD to spend (minimum $50)")
     success_url: Optional[str] = Field(None, description="Redirect URL after successful payment")
     cancel_url: Optional[str] = Field(None, description="Redirect URL if payment cancelled")
 
