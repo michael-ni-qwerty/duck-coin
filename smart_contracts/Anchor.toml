@@ -6,13 +6,13 @@ skip-lint = false
 anchor_version = "0.32.1"
 
 [programs.localnet]
-presale = "J6uoJoaYaytU2PRedpzszvMZMmF4aNvAzHeqgtxQu1nN"
+presale = "66Qho8H4xsVLBqZNLyvxTwRrgMP319rt5EuN2ZzaFay8"
 
 [programs.devnet]
-presale = "J6uoJoaYaytU2PRedpzszvMZMmF4aNvAzHeqgtxQu1nN"
+presale = "66Qho8H4xsVLBqZNLyvxTwRrgMP319rt5EuN2ZzaFay8"
 
 [programs.mainnet]
-presale = "J6uoJoaYaytU2PRedpzszvMZMmF4aNvAzHeqgtxQu1nN"
+presale = "66Qho8H4xsVLBqZNLyvxTwRrgMP319rt5EuN2ZzaFay8"
 
 [registry]
 url = "https://api.apr.dev"

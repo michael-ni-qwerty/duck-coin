@@ -11,8 +11,8 @@ const ADMIN_WALLET = Keypair.fromSecretKey(
   new Uint8Array(JSON.parse(fs.readFileSync("/home/michael/.config/solana/id.json", "utf8")))
 );
 
-const programId = new PublicKey("J6uoJoaYaytU2PRedpzszvMZMmF4aNvAzHeqgtxQu1nN");
-const [configPda] = PublicKey.findProgramAddressSync([Buffer.from("config_v2")], programId);
+const programId = new PublicKey("66Qho8H4xsVLBqZNLyvxTwRrgMP319rt5EuN2ZzaFay8");
+const [configPda] = PublicKey.findProgramAddressSync([Buffer.from("config")], programId);
 const [vaultPda] = PublicKey.findProgramAddressSync([Buffer.from("vault_v2"), configPda.toBuffer()], programId);
 
 async function main() {
