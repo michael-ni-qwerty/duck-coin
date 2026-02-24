@@ -34,4 +34,10 @@ pub enum PresaleError {
     UnlockExceedsMax,
     #[msg("Unlock percentage cannot decrease")]
     UnlockCannotDecrease,
+    #[msg("Claim authority is not bound")]
+    ClaimAuthorityNotBound,
+    #[msg("Claim authority does not match signer")]
+    ClaimAuthorityMismatch,
+    #[msg("Claim authority is already bound to a different wallet")]
+    ClaimAuthorityAlreadyBound,
 }

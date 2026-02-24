@@ -4,11 +4,13 @@ use crate::state::*;
 use crate::constants::*;
 use crate::errors::PresaleError;
 
-pub fn claim(ctx: Context<Claim>) -> Result<()> {
+pub fn claim(ctx: Context<Claim>, _identity_key: [u8; 32]) -> Result<()> {
     let config = &ctx.accounts.config;
     require!(config.status == PresaleStatus::TokenLaunched, PresaleError::NotLaunched);
 
     let allocation = &mut ctx.accounts.user_allocation;
+    require!(allocation.claim_authority != Pubkey::default(), PresaleError::ClaimAuthorityNotBound);
+    require!(allocation.claim_authority == ctx.accounts.user.key(), PresaleError::ClaimAuthorityMismatch);
 
     // Apply any new global unlock of the vesting (non-TGE) portion
     if config.global_unlock_pct > allocation.last_unlock_pct {
@@ -50,12 +52,13 @@ pub fn claim(ctx: Context<Claim>) -> Result<()> {
 }
 
 #[derive(Accounts)]
+#[instruction(identity_key: [u8; 32])]
 pub struct Claim<'info> {
     #[account(seeds = [SEED_CONFIG], bump = config.bump)]
     pub config: Account<'info, PresaleConfig>,
     #[account(
         mut,
-        seeds = [SEED_ALLOCATION, user.key().as_ref()],
+        seeds = [SEED_ALLOCATION, identity_key.as_ref()],
         bump,
     )]
     pub user_allocation: Account<'info, UserAllocation>,

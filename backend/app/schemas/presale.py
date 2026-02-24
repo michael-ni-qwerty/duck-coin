@@ -7,7 +7,7 @@ from datetime import datetime
 
 class CreateInvoiceRequest(BaseModel):
     """Request to create a NOWPayments invoice for token purchase."""
-    wallet_address: str = Field(..., description="Buyer's Solana wallet address (pubkey)")
+    wallet_address: str = Field(..., description="Buyer's wallet address on the source chain")
     usd_amount: float = Field(..., ge=50, description="Amount in USD to spend (minimum $50)")
     success_url: Optional[str] = Field(None, description="Redirect URL after successful payment")
     cancel_url: Optional[str] = Field(None, description="Redirect URL if payment cancelled")
@@ -20,33 +20,6 @@ class CreateInvoiceResponse(BaseModel):
     invoice_id: str = Field(..., description="NOWPayments invoice ID")
     token_amount: int = Field(..., description="Token amount to be credited (in smallest units)")
     usd_amount: float
-
-
-# --- Payment status ---
-
-class PaymentStatusResponse(BaseModel):
-    """Status of a payment."""
-    payment_id: str
-    wallet_address: str
-    usd_amount: float
-    token_amount: int
-    pay_currency: Optional[str] = None
-    payment_status: str
-    credit_status: str
-    credit_tx_signature: Optional[str] = None
-    created_at: datetime
-    paid_at: Optional[datetime] = None
-    credited_at: Optional[datetime] = None
-
-
-# --- Allocation / Vesting ---
-
-class AllocationResponse(BaseModel):
-    """On-chain allocation data for a wallet."""
-    wallet_address: str
-    amount_purchased: int = 0
-    amount_claimed: int = 0
-    claimable_amount: int = 0
 
 
 # --- Presale config & stats ---
@@ -76,37 +49,59 @@ class PresaleStatsResponse(BaseModel):
     is_active: bool
 
 
-# --- Payments history ---
+# --- Smart-contract interaction ---
 
-class PaymentListResponse(BaseModel):
-    """List of payments for a wallet."""
+class ClaimRequest(BaseModel):
+    """Request to prepare an unsigned claim transaction payload for wallet signing."""
+    wallet_address: str = Field(..., description="Investor/source wallet address")
+    solana_wallet: Optional[str] = Field(
+        None,
+        description="Destination Solana wallet that signs the claim transaction.",
+    )
+    user_token_account: Optional[str] = Field(
+        None,
+        description="Optional user SPL token account. If omitted, backend derives the user's ATA for the sale mint.",
+    )
+
+
+class ClaimResponse(BaseModel):
+    """Unsigned claim payload response for client-side signing."""
     wallet_address: str
-    payments: list[PaymentStatusResponse]
-    total_count: int
+    resolved_solana_wallet: str
+    user_token_account: str
+    recent_blockhash: str
+    unsigned_tx_base64: str
 
 
-# --- Investor ---
+class BindClaimWalletRequest(BaseModel):
+    pass
 
-class InvestorResponse(BaseModel):
-    """Investor aggregate data."""
+
+class BindClaimWalletResponse(BaseModel):
+    pass
+
+
+class ContractStatusResponse(BaseModel):
+    """High-level current contract state."""
+    status: str
+    is_active: bool
+    is_token_launched: bool
+    tge_percentage: int
+    global_unlock_pct: int
+    start_time: int
+
+
+class LeaderboardEntryResponse(BaseModel):
+    """Single leaderboard row."""
+    rank: int
     wallet_address: str
     total_invested_usd: float
     total_tokens: int
     payment_count: int
-    extra_data: dict = {}
-    first_invested_at: Optional[datetime] = None
     last_invested_at: Optional[datetime] = None
-    created_at: Optional[datetime] = None
 
 
-class InvestorUpdateRequest(BaseModel):
-    """Update the extra_data JSONB field for an investor."""
-    extra_data: dict
-
-
-# --- Error ---
-
-class ErrorResponse(BaseModel):
-    """Standard error response."""
-    error: str
-    detail: Optional[str] = None
+class LeaderboardResponse(BaseModel):
+    """Leaderboard response."""
+    total_count: int
+    items: list[LeaderboardEntryResponse]

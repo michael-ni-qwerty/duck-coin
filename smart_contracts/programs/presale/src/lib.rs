@@ -7,7 +7,7 @@ pub mod errors;
 pub mod instructions;
 pub mod state;
 
-declare_id!("66Qho8H4xsVLBqZNLyvxTwRrgMP319rt5EuN2ZzaFay8");
+declare_id!("9GprBhFEyLipafFmS75rta8HGZTU5WPZRG3tWGJDBrmC");
 
 #[program]
 pub mod presale {
@@ -22,12 +22,12 @@ pub mod presale {
 
     pub fn credit_allocation(
         ctx: Context<CreditAllocation>,
-        user: Pubkey,
+        identity_key: [u8; 32],
         token_amount: u64,
         usd_amount: u64,
         payment_id: String,
     ) -> Result<()> {
-        instructions::credit_allocation(ctx, user, token_amount, usd_amount, payment_id)
+        instructions::credit_allocation(ctx, identity_key, token_amount, usd_amount, payment_id)
     }
 
     pub fn update_config(ctx: Context<UpdateConfig>, new_price: u64, new_tge: u8, new_daily_cap: u64) -> Result<()> {
@@ -38,8 +38,16 @@ pub mod presale {
         instructions::set_status(ctx, status)
     }
 
-    pub fn claim(ctx: Context<Claim>) -> Result<()> {
-        instructions::claim(ctx)
+    pub fn bind_claim_wallet(
+        ctx: Context<BindClaimWallet>,
+        identity_key: [u8; 32],
+        claim_authority: Pubkey,
+    ) -> Result<()> {
+        instructions::bind_claim_wallet(ctx, identity_key, claim_authority)
+    }
+
+    pub fn claim(ctx: Context<Claim>, identity_key: [u8; 32]) -> Result<()> {
+        instructions::claim(ctx, identity_key)
     }
 
     pub fn set_unlock(ctx: Context<SetUnlock>, unlock_pct: u8) -> Result<()> {
@@ -49,10 +57,16 @@ pub mod presale {
 
 #[event]
 pub struct CreditEvent {
-    pub user: Pubkey,
+    pub identity_key: [u8; 32],
     pub token_amount: u64,
     pub usd_amount: u64,
     pub payment_id: String,
+}
+
+#[event]
+pub struct ClaimWalletBoundEvent {
+    pub identity_key: [u8; 32],
+    pub claim_authority: Pubkey,
 }
 
 #[event]

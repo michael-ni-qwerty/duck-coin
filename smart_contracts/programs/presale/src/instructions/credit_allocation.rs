@@ -5,7 +5,7 @@ use crate::errors::PresaleError;
 
 pub fn credit_allocation(
     ctx: Context<CreditAllocation>,
-    user: Pubkey,
+    identity_key: [u8; 32],
     token_amount: u64,
     usd_amount: u64,
     payment_id: String,
@@ -27,6 +27,9 @@ pub fn credit_allocation(
 
     // 4. Update user allocation
     let allocation = &mut ctx.accounts.user_allocation;
+    if allocation.amount_purchased == 0 {
+        allocation.claim_authority = Pubkey::default();
+    }
     allocation.amount_purchased = allocation.amount_purchased.checked_add(token_amount).unwrap();
 
     // TGE portion → immediately claimable after token launch
@@ -43,7 +46,7 @@ pub fn credit_allocation(
     config.total_raised_usd = config.total_raised_usd.checked_add(usd_amount).unwrap();
 
     emit!(crate::CreditEvent {
-        user,
+        identity_key,
         token_amount,
         usd_amount,
         payment_id,
@@ -53,7 +56,7 @@ pub fn credit_allocation(
 }
 
 #[derive(Accounts)]
-#[instruction(user: Pubkey)]
+#[instruction(identity_key: [u8; 32])]
 pub struct CreditAllocation<'info> {
     #[account(mut, seeds = [SEED_CONFIG], bump = config.bump, constraint = config.admin == admin.key())]
     pub config: Account<'info, PresaleConfig>,
@@ -63,7 +66,7 @@ pub struct CreditAllocation<'info> {
         init_if_needed,
         payer = admin,
         space = 8 + UserAllocation::LEN,
-        seeds = [SEED_ALLOCATION, user.as_ref()],
+        seeds = [SEED_ALLOCATION, identity_key.as_ref()],
         bump
     )]
     pub user_allocation: Account<'info, UserAllocation>,

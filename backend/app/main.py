@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import register_tortoise
 
 from app.core.config import settings
-from app.api import presale, health
+from app.api import health, presale_router
 from app.services.solana import solana_service
 from app.workers.daily_config import daily_config_loop
 
@@ -66,7 +66,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health.router)
-app.include_router(presale.router, prefix=settings.api_v1_prefix)
+app.include_router(presale_router.router, prefix=settings.api_v1_prefix)
 
 
 @app.get("/", tags=["root"])

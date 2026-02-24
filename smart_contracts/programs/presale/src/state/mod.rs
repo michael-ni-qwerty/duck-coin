@@ -49,10 +49,11 @@ pub struct UserAllocation {
     pub claimable_amount: u64,
     pub amount_vesting: u64,
     pub last_unlock_pct: u8,
+    pub claim_authority: Pubkey,
 }
 
 impl UserAllocation {
     // amount_purchased(8) + amount_claimed(8) + claimable_amount(8)
-    // + amount_vesting(8) + last_unlock_pct(1)
-    pub const LEN: usize = 8 + 8 + 8 + 8 + 1;
+    // + amount_vesting(8) + last_unlock_pct(1) + claim_authority(32)
+    pub const LEN: usize = 8 + 8 + 8 + 8 + 1 + 32;
 }

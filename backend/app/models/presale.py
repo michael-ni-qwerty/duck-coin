@@ -27,6 +27,7 @@ class Payment(models.Model):
 
     # User info
     wallet_address = fields.CharField(max_length=128, index=True)
+    claim_wallet_solana = fields.CharField(max_length=128, null=True, index=True)
 
     # NOWPayments data
     nowpayments_invoice_id = fields.CharField(max_length=64, null=True, index=True)

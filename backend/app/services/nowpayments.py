@@ -39,11 +39,11 @@ class NOWPaymentsClient:
             resp.raise_for_status()
             return resp.json()
 
-    async def get_available_currencies(self) -> list:
-        """GET /currencies — list available payment currencies."""
+    async def get_available_currencies(self) -> list[Dict[str, Any]]:
+        """GET /full-currencies — list available payment currencies with full details."""
         async with httpx.AsyncClient() as client:
             resp = await client.get(
-                f"{self._base_url}/currencies", headers=self._headers
+                f"{self._base_url}/full-currencies", headers=self._headers
             )
             resp.raise_for_status()
             return resp.json().get("currencies", [])

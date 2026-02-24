@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     # Solana Configuration (for on-chain credit_allocation calls)
     solana_rpc_url: str = "https://api.devnet.solana.com"
-    presale_program_id: str = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+    presale_program_id: str = "9GprBhFEyLipafFmS75rta8HGZTU5WPZRG3tWGJDBrmC"
     presale_token_mint: str = ""
     # Admin keypair (Base58 encoded) — signs credit_allocation transactions
     admin_private_key: str = ""
@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     nowpayments_ipn_secret: str = ""
     nowpayments_api_url: str = "https://api.nowpayments.io/v1"
     nowpayments_sandbox: bool = False
+    # Public base URL used by external providers (e.g. NOWPayments IPN callbacks)
+    public_api_base_url: str = ""
 
     # Invoice anti-abuse guardrails
     invoice_rate_limit_window_seconds: int = 60

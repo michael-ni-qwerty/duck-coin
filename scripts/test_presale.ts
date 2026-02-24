@@ -1,3 +1,5 @@
+// ANCHOR_PROVIDER_URL=https://api.devnet.solana.com ANCHOR_WALLET=/home/michael/.config/solana/id.json npx ts-node --project scripts/tsconfig.json scripts/test_presale.ts
+
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Keypair, LAMPORTS_PER_SOL, PublicKey, SYSVAR_RENT_PUBKEY, SystemProgram } from "@solana/web3.js";
@@ -244,8 +246,11 @@ async function creditAllocationForUser(user: PublicKey, expectedTgePct?: number)
         amountVesting: 0n,
       };
 
+  // Convert user PublicKey to 32-byte identity_key
+  const identityKey = user.toBuffer();
+  
   const tx = await program.methods
-    .creditAllocation(user, new anchor.BN(TOKEN_AMOUNT_RAW.toString()), USD_AMOUNT, `payment_${Date.now()}`)
+    .creditAllocation(identityKey, new anchor.BN(TOKEN_AMOUNT_RAW.toString()), USD_AMOUNT, `payment_${Date.now()}`)
     .accounts({
       config: configPda,
       dailyState: dailyStatePda,
