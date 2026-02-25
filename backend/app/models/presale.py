@@ -20,6 +20,18 @@ class CreditStatus(str, Enum):
     FAILED = "failed"
 
 
+class AuthMessage(models.Model):
+    """Stores nonce messages for signature verification."""
+
+    wallet_address = fields.CharField(max_length=128, pk=True)
+    message = fields.CharField(max_length=255)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    expires_at = fields.DatetimeField()
+
+    class Meta:
+        table = "auth_messages"
+
+
 class Payment(models.Model):
     """Tracks a NOWPayments payment and its on-chain credit status."""
 

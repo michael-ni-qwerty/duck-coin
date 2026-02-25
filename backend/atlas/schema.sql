@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS payments (
 
     -- User info
     wallet_address VARCHAR(128) NOT NULL,
+    claim_wallet_solana VARCHAR(128),
 
     -- NOWPayments data
     nowpayments_invoice_id VARCHAR(64),
@@ -38,6 +39,7 @@ CREATE TABLE IF NOT EXISTS payments (
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_payments_wallet_address ON payments(wallet_address);
+CREATE INDEX IF NOT EXISTS idx_payments_claim_wallet_solana ON payments(claim_wallet_solana);
 CREATE INDEX IF NOT EXISTS idx_payments_invoice_id ON payments(nowpayments_invoice_id);
 CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(nowpayments_order_id);
 CREATE INDEX IF NOT EXISTS idx_payments_payment_status ON payments(payment_status);
@@ -78,3 +80,11 @@ CREATE TABLE IF NOT EXISTS investors (
 );
 
 CREATE INDEX IF NOT EXISTS idx_investors_wallet_address ON investors(wallet_address);
+
+-- AuthMessages table: stores nonces for wallet signature verification
+CREATE TABLE IF NOT EXISTS auth_messages (
+    wallet_address VARCHAR(128) PRIMARY KEY,
+    message VARCHAR(255) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL
+);

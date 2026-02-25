@@ -4,7 +4,9 @@ from fastapi import APIRouter, HTTPException, status
 from solders.pubkey import Pubkey
 
 from app.core.config import settings
-from app.models.presale import CreditStatus, Payment
+import secrets
+from datetime import datetime, timedelta, timezone
+from app.models.presale import CreditStatus, Payment, AuthMessage
 from app.schemas.presale import (
     BindClaimWalletRequest,
     BindClaimWalletResponse,
@@ -13,10 +15,13 @@ from app.schemas.presale import (
     ContractStatusResponse,
     PresaleConfigResponse,
     PresaleStatsResponse,
+    GetMessageResponse,
 )
 from app.services.solana import solana_service
 
-from .common import is_solana_wallet_address, validate_wallet_address
+from .common import is_solana_wallet_address, validate_wallet_address, classify_wallet_address
+from eth_account.messages import encode_defunct
+from eth_account import Account
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -77,6 +82,49 @@ async def get_contract_status() -> ContractStatusResponse:
     )
 
 
+@router.get(
+    "/message",
+    response_model=GetMessageResponse,
+    summary="Get message for wallet binding",
+)
+async def get_message(wallet_address: str) -> GetMessageResponse:
+    if not validate_wallet_address(wallet_address):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported wallet_address format.",
+        )
+        
+    # Check if the wallet has any payments
+    payment_exists = await Payment.filter(wallet_address__iexact=wallet_address).exists()
+    if not payment_exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Wallet has no recorded payments.",
+        )
+    
+    nonce_str = secrets.token_hex(16)
+    # Generate an EIP-4361 inspired message to ensure clarity on what the user is signing
+    message = (
+        f"Welcome to Duck Coin Presale!\n\n"
+        f"Click to sign in and verify your ownership of this wallet.\n\n"
+        f"Wallet Address: {wallet_address.lower()}\n"
+        f"Nonce: {nonce_str}"
+    )
+    
+    # Messages expire in 5 minutes to mitigate replay attack windows
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+    
+    await AuthMessage.update_or_create(
+        wallet_address=wallet_address.lower(),
+        defaults={
+            "message": message,
+            "expires_at": expires_at
+        }
+    )
+    
+    return GetMessageResponse(message=message)
+
+
 @router.post(
     "/bind-claim-wallet",
     response_model=BindClaimWalletResponse,
@@ -88,40 +136,69 @@ async def bind_claim_wallet(body: BindClaimWalletRequest) -> BindClaimWalletResp
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Unsupported wallet_address format.",
         )
-    if is_solana_wallet_address(body.wallet_address):
-        # Allow passing for now, but signature verification for solana is different.
+
+    # Check if the wallet has any payments before attempting to bind
+    payment_exists = await Payment.filter(wallet_address__iexact=body.wallet_address).exists()
+    if not payment_exists:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Solana wallet binding not yet supported.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Wallet has no recorded payments.",
         )
 
-    # EVM Signature Verification
-    from eth_account.messages import encode_defunct
-    from eth_account import Account
-    
-    try:
-        message = encode_defunct(text=body.message)
-        recovered_address = Account.recover_message(message, signature=body.signature)
-        
-        if recovered_address.lower() != body.wallet_address.lower():
+    wallet_type = classify_wallet_address(body.wallet_address)
+    match wallet_type:
+        case "solana":
+            # Signature verification for solana is different.
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Signature verification failed: recovered address does not match wallet_address.",
-            )
-            
-        # Verify the message contains the solana wallet to prevent replay attacks on other wallets
-        if body.solana_wallet not in body.message:
-             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Message must contain the solana wallet address being bound.",
+                detail="Solana wallet binding not yet supported.",
             )
-            
-    except Exception as e:
-        logger.error(f"EVM signature verification error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid signature or message format: {str(e)}",
-        )
+        case "evm":
+            try:
+                # 1. Fetch the message from the database
+                auth_message = await AuthMessage.get_or_none(wallet_address=body.wallet_address.lower())
+                
+                # 2. Check if a message exists
+                if not auth_message:
+                     raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid message or message mismatch.",
+                    )
+                    
+                # 3. Check expiration
+                if datetime.now(timezone.utc) > auth_message.expires_at:
+                    await auth_message.delete()
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Message has expired. Please request a new one.",
+                    )
+                    
+                # 4. Verify the signature itself matches the expected message
+                encoded_message = encode_defunct(text=auth_message.message)
+                recovered_address = Account.recover_message(encoded_message, signature=body.signature)
+                
+                if recovered_address.lower() != body.wallet_address.lower():
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Signature verification failed: recovered address does not match wallet_address.",
+                    )
+                    
+                # 5. Prevent replay attacks: delete the message immediately after successful verification
+                await auth_message.delete()
+                    
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"EVM signature verification error: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid signature format: {str(e)}",
+                )
+        case _:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unsupported wallet type.",
+            )
         
     try:
         tx_sig = await solana_service.bind_claim_wallet(

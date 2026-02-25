@@ -10,6 +10,13 @@ from .common import calculate_token_amount
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+allowed_networks = {
+    'ethereum', 'eth', 'bsc', 'binance-smart-chain', 'polygon', 'matic', 
+    'arbitrum', 'arb', 'avalanche', 'avax', 'fantom', 'ftm', 'optimism',
+    'op', 'base', 'linea', 'zkSync', 'zksync', 'cronos', 'cro', 'solana', 'sol'
+}
+
+temp_not_works = ("1inchbsc", "")
 
 class CurrencyItemResponse(BaseModel):
     id: int
@@ -49,7 +56,17 @@ async def get_currencies() -> CurrenciesResponse:
     """Get list of cryptocurrencies available for payment via NOWPayments."""
     try:
         currencies = await nowpayments_client.get_available_currencies()
-        return CurrenciesResponse(currencies=currencies)
+        
+        # Filter for EVM and Solana blockchains only
+        allowed_currencies = []
+        
+        for currency in currencies:
+            if currency and currency.get('network'):
+                network = currency.get('network', '').lower()
+                if network in allowed_networks and currency.get('code').lower() not in temp_not_works:
+                    allowed_currencies.append(currency)
+        
+        return CurrenciesResponse(currencies=allowed_currencies)
     except Exception as e:
         logger.error(f"Failed to fetch currencies: {e}")
         raise HTTPException(

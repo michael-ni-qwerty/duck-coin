@@ -73,10 +73,12 @@ class ClaimResponse(BaseModel):
     unsigned_tx_base64: str
 
 
+class GetMessageResponse(BaseModel):
+    message: str = Field(..., description="The message to be signed by the user")
+
 class BindClaimWalletRequest(BaseModel):
     wallet_address: str = Field(..., description="EVM wallet address that made the purchase")
     solana_wallet: str = Field(..., description="Solana wallet address to bind as claim authority")
-    message: str = Field(..., description="The message that was signed by the wallet_address")
     signature: str = Field(..., description="The signature of the message")
 
 
