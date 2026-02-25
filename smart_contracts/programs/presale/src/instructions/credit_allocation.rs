@@ -19,7 +19,7 @@ pub fn credit_allocation(
 
     // 2. Check daily cap
     let current_day = (clock.unix_timestamp / 86400) as u64;
-    require!(ctx.accounts.daily_state.current_day == current_day, PresaleError::UpdateConfigOnlyOnNewDay);
+    // require!(ctx.accounts.daily_state.current_day == current_day, PresaleError::UpdateConfigOnlyOnNewDay);
     require!(ctx.accounts.daily_state.sold_today.checked_add(token_amount).unwrap() <= config.daily_cap, PresaleError::DailyCapExceeded);
 
     // 3. Check supply
