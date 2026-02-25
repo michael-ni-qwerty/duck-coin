@@ -36,11 +36,25 @@ class Settings(BaseSettings):
     database_url: str = "postgres://user:password@localhost:5432/duckcoin"
 
     @property
+    def cleaned_database_url(self) -> str:
+        """Strip problematic query parameters like sslmode from database_url."""
+        url = self.database_url
+        if "?" in url:
+            base, query = url.split("?", 1)
+            params = query.split("&")
+            # Filter out sslmode and ssl_mode
+            filtered_params = [p for p in params if not p.startswith(("sslmode=", "ssl_mode="))]
+            if filtered_params:
+                return f"{base}?{'&'.join(filtered_params)}"
+            return base
+        return url
+
+    @property
     def tortoise_config(self) -> dict:
         """Tortoise ORM configuration."""
         return {
             "connections": {
-                "default": self.database_url,
+                "default": self.cleaned_database_url,
             },
             "apps": {
                 "models": {
