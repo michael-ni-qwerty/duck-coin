@@ -83,7 +83,60 @@ async def get_contract_status() -> ContractStatusResponse:
     summary="Bind claim wallet",
 )
 async def bind_claim_wallet(body: BindClaimWalletRequest) -> BindClaimWalletResponse:
-    pass
+    if not validate_wallet_address(body.wallet_address):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported wallet_address format.",
+        )
+    if is_solana_wallet_address(body.wallet_address):
+        # Allow passing for now, but signature verification for solana is different.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Solana wallet binding not yet supported.",
+        )
+
+    # EVM Signature Verification
+    from eth_account.messages import encode_defunct
+    from eth_account import Account
+    
+    try:
+        message = encode_defunct(text=body.message)
+        recovered_address = Account.recover_message(message, signature=body.signature)
+        
+        if recovered_address.lower() != body.wallet_address.lower():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Signature verification failed: recovered address does not match wallet_address.",
+            )
+            
+        # Verify the message contains the solana wallet to prevent replay attacks on other wallets
+        if body.solana_wallet not in body.message:
+             raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Message must contain the solana wallet address being bound.",
+            )
+            
+    except Exception as e:
+        logger.error(f"EVM signature verification error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid signature or message format: {str(e)}",
+        )
+        
+    try:
+        tx_sig = await solana_service.bind_claim_wallet(
+            wallet_address=body.wallet_address,
+            solana_wallet=body.solana_wallet,
+        )
+        return BindClaimWalletResponse(tx_signature=tx_sig)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to bind claim wallet: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to bind claim wallet on-chain",
+        )
 
 
 @router.post(

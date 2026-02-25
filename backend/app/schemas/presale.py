@@ -74,11 +74,14 @@ class ClaimResponse(BaseModel):
 
 
 class BindClaimWalletRequest(BaseModel):
-    pass
+    wallet_address: str = Field(..., description="EVM wallet address that made the purchase")
+    solana_wallet: str = Field(..., description="Solana wallet address to bind as claim authority")
+    message: str = Field(..., description="The message that was signed by the wallet_address")
+    signature: str = Field(..., description="The signature of the message")
 
 
 class BindClaimWalletResponse(BaseModel):
-    pass
+    tx_signature: str = Field(..., description="The transaction signature of the on-chain binding")
 
 
 class ContractStatusResponse(BaseModel):
