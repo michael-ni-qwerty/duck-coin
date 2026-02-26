@@ -157,37 +157,38 @@ async def create_invoice(request: CreateInvoiceRequest) -> CreateInvoiceResponse
             detail="Unsupported wallet_address format. Expected Solana or EVM address.",
         )
 
-    now = datetime.now(timezone.utc)
-    active_statuses = [
-        PaymentStatus.WAITING,
-        PaymentStatus.CONFIRMING,
-        PaymentStatus.CONFIRMED,
-        PaymentStatus.SENDING,
-        PaymentStatus.PARTIALLY_PAID,
-    ]
+    # TODO: uncomment limits after testing
+    # now = datetime.now(timezone.utc)
+    # active_statuses = [
+    #     PaymentStatus.WAITING,
+    #     PaymentStatus.CONFIRMING,
+    #     PaymentStatus.CONFIRMED,
+    #     PaymentStatus.SENDING,
+    #     PaymentStatus.PARTIALLY_PAID,
+    # ]
 
-    rate_window_start = now - timedelta(seconds=settings.invoice_rate_limit_window_seconds)
-    recent_invoice_count = await Payment.filter(
-        wallet_address=wallet_address,
-        created_at__gte=rate_window_start,
-    ).count()
-    if recent_invoice_count >= settings.invoice_rate_limit_max_per_window:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many invoice requests. Please try again later.",
-        )
+    # rate_window_start = now - timedelta(seconds=settings.invoice_rate_limit_window_seconds)
+    # recent_invoice_count = await Payment.filter(
+    #     wallet_address=wallet_address,
+    #     created_at__gte=rate_window_start,
+    # ).count()
+    # if recent_invoice_count >= settings.invoice_rate_limit_max_per_window:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+    #         detail="Too many invoice requests. Please try again later.",
+    #     )
 
-    active_window_start = now - timedelta(hours=settings.invoice_active_window_hours)
-    active_invoice_count = await Payment.filter(
-        wallet_address=wallet_address,
-        payment_status__in=active_statuses,
-        created_at__gte=active_window_start,
-    ).count()
-    if active_invoice_count >= settings.invoice_max_active_per_wallet:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many active invoices for this wallet. Complete or wait for existing invoices first.",
-        )
+    # active_window_start = now - timedelta(hours=settings.invoice_active_window_hours)
+    # active_invoice_count = await Payment.filter(
+    #     wallet_address=wallet_address,
+    #     payment_status__in=active_statuses,
+    #     created_at__gte=active_window_start,
+    # ).count()
+    # if active_invoice_count >= settings.invoice_max_active_per_wallet:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+    #         detail="Too many active invoices for this wallet. Complete or wait for existing invoices first.",
+    #     )
 
     token_amount = calculate_token_amount(request.usd_amount)
     order_id = build_order_id()
