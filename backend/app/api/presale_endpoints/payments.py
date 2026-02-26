@@ -10,6 +10,8 @@ from app.models.presale import CreditStatus, Payment, PaymentStatus
 from app.schemas.presale import (
     CreateInvoiceRequest,
     CreateInvoiceResponse,
+    PaymentResponse,
+    PaymentListResponse,
 )
 from app.services.nowpayments import NOWPaymentsClient, nowpayments_client
 from app.services.solana import solana_service
@@ -23,6 +25,115 @@ from .common import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+@router.get(
+    "/status/{payment_id}",
+    response_model=PaymentResponse,
+    summary="Get payment status",
+    description="Get the current status of a payment by its internal ID.",
+)
+async def get_payment_status(payment_id: str) -> PaymentResponse:
+    """Get the current status of a payment."""
+    payment = await Payment.get_or_none(id=payment_id)
+    if not payment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
+        
+    # Optional: Update status from NOWPayments if it's in a pending state
+    if payment.payment_status in [PaymentStatus.WAITING, PaymentStatus.CONFIRMING, PaymentStatus.SENDING] and payment.nowpayments_payment_id:
+        try:
+            nowpayments_status = await nowpayments_client.get_payment_status(payment.nowpayments_payment_id)
+            status_map = {
+                "waiting": PaymentStatus.WAITING,
+                "confirming": PaymentStatus.CONFIRMING,
+                "confirmed": PaymentStatus.CONFIRMED,
+                "sending": PaymentStatus.SENDING,
+                "partially_paid": PaymentStatus.PARTIALLY_PAID,
+                "finished": PaymentStatus.FINISHED,
+                "failed": PaymentStatus.FAILED,
+                "refunded": PaymentStatus.REFUNDED,
+                "expired": PaymentStatus.EXPIRED,
+            }
+            new_status_str = nowpayments_status.get("payment_status")
+            new_status = status_map.get(new_status_str)
+            
+            if new_status and new_status != payment.payment_status:
+                payment.payment_status = new_status
+                if new_status == PaymentStatus.FINISHED:
+                    payment.paid_at = datetime.now(timezone.utc)
+                await payment.save()
+        except Exception as e:
+            logger.error(f"Failed to update payment status from NOWPayments: {e}")
+
+    return PaymentResponse(
+        id=str(payment.id),
+        wallet_address=payment.wallet_address,
+        nowpayments_invoice_id=payment.nowpayments_invoice_id,
+        nowpayments_payment_id=payment.nowpayments_payment_id,
+        nowpayments_order_id=payment.nowpayments_order_id,
+        price_amount_usd=float(payment.price_amount_usd),
+        token_amount=payment.token_amount,
+        pay_amount=float(payment.pay_amount) if payment.pay_amount else None,
+        pay_currency=payment.pay_currency,
+        actually_paid=float(payment.actually_paid) if payment.actually_paid else None,
+        payment_status=payment.payment_status.value,
+        credit_status=payment.credit_status.value,
+        credit_tx_signature=payment.credit_tx_signature,
+        created_at=payment.created_at,
+        updated_at=payment.updated_at,
+        paid_at=payment.paid_at,
+        credited_at=payment.credited_at,
+    )
+
+
+@router.get(
+    "/list",
+    response_model=PaymentListResponse,
+    summary="List payments",
+    description="List all payments for a given wallet address.",
+)
+async def list_payments(wallet_address: str, limit: int = 50, offset: int = 0) -> PaymentListResponse:
+    """List payments for a specific wallet address."""
+    if not wallet_address:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="wallet_address is required",
+        )
+        
+    payments_qs = Payment.filter(wallet_address=wallet_address)
+    total_count = await payments_qs.count()
+    payments = await payments_qs.order_by("-created_at").offset(offset).limit(limit)
+    
+    items = [
+        PaymentResponse(
+            id=str(p.id),
+            wallet_address=p.wallet_address,
+            nowpayments_invoice_id=p.nowpayments_invoice_id,
+            nowpayments_payment_id=p.nowpayments_payment_id,
+            nowpayments_order_id=p.nowpayments_order_id,
+            price_amount_usd=float(p.price_amount_usd),
+            token_amount=p.token_amount,
+            pay_amount=float(p.pay_amount) if p.pay_amount else None,
+            pay_currency=p.pay_currency,
+            actually_paid=float(p.actually_paid) if p.actually_paid else None,
+            payment_status=p.payment_status.value,
+            credit_status=p.credit_status.value,
+            credit_tx_signature=p.credit_tx_signature,
+            created_at=p.created_at,
+            updated_at=p.updated_at,
+            paid_at=p.paid_at,
+            credited_at=p.credited_at,
+        )
+        for p in payments
+    ]
+    
+    return PaymentListResponse(
+        items=items,
+        total_count=total_count,
+    )
 
 
 @router.post(

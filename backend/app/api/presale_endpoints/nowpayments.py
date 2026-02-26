@@ -47,6 +47,58 @@ class EstimateResponse(BaseModel):
     token_amount: int
 
 
+class StatusResponse(BaseModel):
+    message: str
+
+
+class MinAmountResponse(BaseModel):
+    currency_from: str
+    min_amount: float
+    fiat_equivalent: float | None = None
+
+
+@router.get(
+    "/status",
+    response_model=StatusResponse,
+    summary="Check API status",
+)
+async def get_status() -> StatusResponse:
+    """Check NOWPayments API availability."""
+    try:
+        status_data = await nowpayments_client.get_status()
+        return StatusResponse(message=status_data.get("message", "OK"))
+    except Exception as e:
+        logger.error(f"Failed to fetch status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to fetch API status",
+        )
+
+
+@router.get(
+    "/min-amount",
+    response_model=MinAmountResponse,
+    summary="Get minimum payment amount",
+)
+async def get_min_amount(currency_from: str = "usd") -> MinAmountResponse:
+    """Get minimum payment amount for the selected currency pair."""
+    try:
+        min_amount_data = await nowpayments_client.get_min_amount(
+            currency_from=currency_from,
+        )
+        return MinAmountResponse(
+            currency_from=min_amount_data.get("currency_from", currency_from),
+            min_amount=min_amount_data.get("min_amount", 0.0),
+            fiat_equivalent=min_amount_data.get("fiat_equivalent"),
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch min amount: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to fetch minimum payment amount",
+        )
+
+
 @router.get(
     "/currencies",
     response_model=CurrenciesResponse,

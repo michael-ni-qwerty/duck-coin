@@ -22,6 +22,33 @@ class CreateInvoiceResponse(BaseModel):
     usd_amount: float
 
 
+class PaymentResponse(BaseModel):
+    """Details of a payment."""
+    id: str
+    wallet_address: str
+    nowpayments_invoice_id: Optional[str]
+    nowpayments_payment_id: Optional[int]
+    nowpayments_order_id: Optional[str]
+    price_amount_usd: float
+    token_amount: int
+    pay_amount: Optional[float]
+    pay_currency: Optional[str]
+    actually_paid: Optional[float]
+    payment_status: str
+    credit_status: str
+    credit_tx_signature: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    paid_at: Optional[datetime]
+    credited_at: Optional[datetime]
+
+
+class PaymentListResponse(BaseModel):
+    """List of payments."""
+    items: list[PaymentResponse]
+    total_count: int
+
+
 # --- Presale config & stats ---
 
 class PresaleConfigResponse(BaseModel):

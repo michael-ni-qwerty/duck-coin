@@ -69,7 +69,7 @@ class NOWPaymentsClient:
             return resp.json()
 
     async def get_min_amount(
-        self, currency_from: str = "usd", currency_to: str = "btc"
+        self, currency_from: str = "usd"
     ) -> Dict[str, Any]:
         """GET /min-amount — get minimum payment amount."""
         async with httpx.AsyncClient() as client:
@@ -78,7 +78,6 @@ class NOWPaymentsClient:
                 headers=self._headers,
                 params={
                     "currency_from": currency_from,
-                    "currency_to": currency_to,
                 },
             )
             resp.raise_for_status()
