@@ -19,7 +19,7 @@ import {
 
 export async function initializePresale(): Promise<void> {
   console.log("\n--- 1) initialize presale ---");
-  const startTime = new anchor.BN(Math.floor(Date.now() / 1000) - 3600);
+  const startTime = new anchor.BN(Math.floor(Date.now() / 1000) + 86400);
   
   const existingConfig = await program.account.presaleConfig.fetchNullable(configPda);
   if (existingConfig) {
