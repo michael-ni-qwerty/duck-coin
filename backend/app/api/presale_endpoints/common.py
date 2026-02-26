@@ -60,7 +60,7 @@ def build_order_id() -> str:
     return str(uuid.uuid4())
 
 
-async def upsert_investor(payment: Payment) -> None:
+async def upsert_investor(payment: Payment, launching_tokens: int = 0) -> None:
     """Create or update the Investor record after a successful credit."""
     now = datetime.now(timezone.utc)
     investor_wallet = payment.wallet_address
@@ -69,6 +69,7 @@ async def upsert_investor(payment: Payment) -> None:
         defaults={
             "total_invested_usd": payment.price_amount_usd,
             "total_tokens": payment.token_amount,
+            "launching_tokens": launching_tokens,
             "payment_count": 1,
             "first_invested_at": now,
             "last_invested_at": now,
@@ -77,6 +78,8 @@ async def upsert_investor(payment: Payment) -> None:
     if not created:
         investor.total_invested_usd += payment.price_amount_usd
         investor.total_tokens += payment.token_amount
+        if launching_tokens > 0:
+            investor.launching_tokens = launching_tokens
         investor.payment_count += 1
         investor.last_invested_at = now
         await investor.save()

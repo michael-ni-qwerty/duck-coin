@@ -84,6 +84,7 @@ class Investor(models.Model):
     # Aggregated totals (updated on each credited payment)
     total_invested_usd = fields.DecimalField(max_digits=18, decimal_places=2, default=0)
     total_tokens = fields.BigIntField(default=0)
+    launching_tokens = fields.BigIntField(default=0)
     payment_count = fields.IntField(default=0)
 
     # Flexible metadata (JSONB)

@@ -53,7 +53,7 @@ export async function updateConfigTge(newTgePct: number): Promise<void> {
   }
 
   const tx = await program.methods
-    .updateConfig(config.tokenPriceUsd, newTgePct, config.dailyCap)
+    .updateConfig(config.tokenPriceUsd, newTgePct, config.dailyCap, config.startTime)
     .accounts({
       config: configPda,
       dailyState: dailyStatePda,
@@ -113,24 +113,78 @@ async function readConfigState(): Promise<void> {
   // Removed logging of dailyState.lastReset which caused issues with some IDL versions
 }
 
+async function changeStartTime(): Promise<void> {
+  console.log("\n--- change start time to tomorrow ---");
+  let config = await program.account.presaleConfig.fetch(configPda);
+  const dailyState = await program.account.dailyState.fetch(dailyStatePda);
+  const oldStartTime = Number(config.startTime);
+  console.log(`[CONFIG] before update start_time=${oldStartTime} (${new Date(oldStartTime * 1000).toLocaleString()})`);
+
+  const dayTomorrow = new anchor.BN(Math.floor(Date.now() / 1000) + 86400);
+  console.log(`[CONFIG] setting start_time to tomorrow=${dayTomorrow.toString()} (${new Date(dayTomorrow.toNumber() * 1000).toLocaleString()})`);
+
+  const currentDailyCap = BigInt(config.dailyCap.toString());
+  const soldTodayCfg = BigInt(config.soldToday.toString());
+  const soldTodayDaily = BigInt(dailyState.soldToday.toString());
+  const burnManual = currentDailyCap - soldTodayCfg;
+  const burnRollover = currentDailyCap > soldTodayDaily ? currentDailyCap - soldTodayDaily : 0n;
+  const expectedBurn = burnManual + burnRollover;
+  const reserveForClaims = TOKEN_AMOUNT_RAW * 2n;
+  const requiredBeforeUpdate = expectedBurn + reserveForClaims;
+
+  const vaultBefore = await getAccount(provider.connection, vaultPda);
+  if (vaultBefore.amount < requiredBeforeUpdate) {
+    const topUp = requiredBeforeUpdate - vaultBefore.amount;
+    const mintSig = await mintTo(
+      provider.connection,
+      ADMIN_WALLET.payer,
+      TOKEN_MINT,
+      vaultPda,
+      ADMIN_WALLET.payer,
+      topUp
+    );
+    console.log(`[CONFIG] pre-burn vault top-up=${topUp.toString()} tx=${mintSig}`);
+  }
+
+  const tx = await program.methods
+    .updateConfig(config.tokenPriceUsd, config.tgePercentage, config.dailyCap, dayTomorrow)
+    .accounts({
+      config: configPda,
+      dailyState: dailyStatePda,
+      admin: ADMIN_WALLET.publicKey,
+      tokenMint: TOKEN_MINT,
+      vaultTokenAccount: vaultPda,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    })
+    .rpc();
+  console.log(`[CONFIG] updateConfig tx=${tx}`);
+
+  config = await program.account.presaleConfig.fetch(configPda);
+  const newStartTime = Number(config.startTime);
+  console.log(`[CONFIG] after update start_time=${newStartTime} (${new Date(newStartTime * 1000).toLocaleString()})`);
+}
+
 async function runConfigManagementTests(): Promise<void> {
   console.log("Starting config management tests...");
   console.log(`Program ID: ${program.programId.toBase58()}`);
   console.log(`Admin: ${ADMIN_WALLET.publicKey.toBase58()}`);
 
-  await readConfigState();
+  // await readConfigState();
   
-  await setGlobalUnlock(0);
+  // await setGlobalUnlock(0);
+  // await readConfigState();
+
+  // await updateConfigTge(TARGET_TGE_PERCENTAGE);
+  // await readConfigState();
+
+  await changeStartTime();
   await readConfigState();
 
-  await updateConfigTge(TARGET_TGE_PERCENTAGE);
-  await readConfigState();
+  // await setGlobalUnlock(15);
+  // await readConfigState();
 
-  await setGlobalUnlock(15);
-  await readConfigState();
-
-  await setStatusTokenLaunched();
-  await readConfigState();
+  // await setStatusTokenLaunched();
+  // await readConfigState();
 
   console.log("\nConfig management tests completed successfully.");
 }

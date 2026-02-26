@@ -9,11 +9,16 @@ pub fn update_config(
     new_price: u64,
     new_tge: u8,
     new_daily_cap: u64,
+    // TODO: delete this after testing
+    new_start_time: i64,
 ) -> Result<()> {
     let config = &mut ctx.accounts.config;
     let daily_state = &mut ctx.accounts.daily_state;
     let clock = Clock::get()?;
     let current_day = (clock.unix_timestamp / 86400) as u64;
+
+    // TODO: delete this after testing
+    config.start_time = new_start_time;
 
     // Force ability to update config only in new day
     // require!(daily_state.current_day < current_day, PresaleError::UpdateConfigOnlyOnNewDay);

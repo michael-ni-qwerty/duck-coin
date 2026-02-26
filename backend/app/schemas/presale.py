@@ -5,25 +5,37 @@ from datetime import datetime
 
 # --- Invoice / Payment creation ---
 
+
 class CreateInvoiceRequest(BaseModel):
     """Request to create a NOWPayments invoice for token purchase."""
-    wallet_address: str = Field(..., description="Buyer's wallet address on the source chain")
+
+    wallet_address: str = Field(
+        ..., description="Buyer's wallet address on the source chain"
+    )
     usd_amount: float = Field(..., description="Amount in USD to spend (minimum $50)")
-    success_url: Optional[str] = Field(None, description="Redirect URL after successful payment")
-    cancel_url: Optional[str] = Field(None, description="Redirect URL if payment cancelled")
+    success_url: Optional[str] = Field(
+        None, description="Redirect URL after successful payment"
+    )
+    cancel_url: Optional[str] = Field(
+        None, description="Redirect URL if payment cancelled"
+    )
 
 
 class CreateInvoiceResponse(BaseModel):
     """Response with NOWPayments invoice details."""
+
     payment_id: str = Field(..., description="Internal payment record ID")
     invoice_url: str = Field(..., description="NOWPayments hosted payment page URL")
     invoice_id: str = Field(..., description="NOWPayments invoice ID")
-    token_amount: int = Field(..., description="Token amount to be credited (in smallest units)")
+    token_amount: int = Field(
+        ..., description="Token amount to be credited (in smallest units)"
+    )
     usd_amount: float
 
 
 class PaymentResponse(BaseModel):
     """Details of a payment."""
+
     id: str
     wallet_address: str
     nowpayments_invoice_id: Optional[str]
@@ -45,14 +57,17 @@ class PaymentResponse(BaseModel):
 
 class PaymentListResponse(BaseModel):
     """List of payments."""
+
     items: list[PaymentResponse]
     total_count: int
 
 
 # --- Presale config & stats ---
 
+
 class PresaleConfigResponse(BaseModel):
     """Current on-chain presale configuration."""
+
     program_id: str
     token_mint: str
     token_price_usd: int
@@ -69,6 +84,7 @@ class PresaleConfigResponse(BaseModel):
 
 class PresaleStatsResponse(BaseModel):
     """Aggregate presale statistics."""
+
     total_sold: int
     total_raised_usd: int
     total_participants: int
@@ -78,8 +94,10 @@ class PresaleStatsResponse(BaseModel):
 
 # --- Smart-contract interaction ---
 
+
 class ClaimRequest(BaseModel):
     """Request to prepare an unsigned claim transaction payload for wallet signing."""
+
     wallet_address: str = Field(..., description="Investor/source wallet address")
     solana_wallet: Optional[str] = Field(
         None,
@@ -93,6 +111,7 @@ class ClaimRequest(BaseModel):
 
 class ClaimResponse(BaseModel):
     """Unsigned claim payload response for client-side signing."""
+
     wallet_address: str
     resolved_solana_wallet: str
     user_token_account: str
@@ -103,18 +122,26 @@ class ClaimResponse(BaseModel):
 class GetMessageResponse(BaseModel):
     message: str = Field(..., description="The message to be signed by the user")
 
+
 class BindClaimWalletRequest(BaseModel):
-    wallet_address: str = Field(..., description="EVM wallet address that made the purchase")
-    solana_wallet: str = Field(..., description="Solana wallet address to bind as claim authority")
+    wallet_address: str = Field(
+        ..., description="EVM wallet address that made the purchase"
+    )
+    solana_wallet: str = Field(
+        ..., description="Solana wallet address to bind as claim authority"
+    )
     signature: str = Field(..., description="The signature of the message")
 
 
 class BindClaimWalletResponse(BaseModel):
-    tx_signature: str = Field(..., description="The transaction signature of the on-chain binding")
+    tx_signature: str = Field(
+        ..., description="The transaction signature of the on-chain binding"
+    )
 
 
 class ContractStatusResponse(BaseModel):
     """High-level current contract state."""
+
     status: str
     is_active: bool
     is_token_launched: bool
@@ -125,6 +152,7 @@ class ContractStatusResponse(BaseModel):
 
 class LeaderboardEntryResponse(BaseModel):
     """Single leaderboard row."""
+
     rank: int
     wallet_address: str
     total_invested_usd: float
@@ -135,5 +163,23 @@ class LeaderboardEntryResponse(BaseModel):
 
 class LeaderboardResponse(BaseModel):
     """Leaderboard response."""
+
     total_count: int
     items: list[LeaderboardEntryResponse]
+
+
+class PriceInfoResponse(BaseModel):
+    """Current and launch token prices in USD."""
+
+    current_price_usd: float
+    launch_price_usd: float
+
+
+class InvestorInfoResponse(BaseModel):
+    """Information about a specific investor."""
+
+    wallet_address: str
+    invested: float = Field(..., description="Total USD invested")
+    tokens: int = Field(..., description="Total tokens purchased")
+    balance: float = Field(..., description="Same as invested")
+    launch_evaluation: float = Field(..., description="launching_tokens * launch_price")

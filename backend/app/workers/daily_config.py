@@ -16,7 +16,7 @@ from datetime import date, datetime, time, timezone, timedelta
 
 from app.core.config import settings
 from app.services.solana import solana_service
-from app.workers.tokenomics import SCHEDULE, TOTAL_DAYS
+from app.workers.tokenomics import SCHEDULE, TOTAL_DAYS, _get_presale_day
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +31,6 @@ def _seconds_until(target: time) -> float:
     if target_dt <= now:
         target_dt += timedelta(days=1)
     return (target_dt - now).total_seconds()
-
-
-def _get_presale_day() -> int:
-    """Return the current presale day number (1-based)."""
-    start = date.fromisoformat(settings.presale_start_date)
-    today = datetime.now(timezone.utc).date()
-    return (today - start).days + 1
 
 
 async def _do_daily_update() -> None:
@@ -103,3 +96,6 @@ async def daily_config_loop() -> None:
 
         # Sleep a bit to avoid double-firing on the same second
         await asyncio.sleep(60)
+
+
+""

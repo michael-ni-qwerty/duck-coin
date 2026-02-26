@@ -14,6 +14,8 @@ On-chain precision:
 """
 
 from dataclasses import dataclass
+from datetime import date, datetime, time, timezone, timedelta
+from app.core.config import settings
 
 TOKEN_DECIMALS = 10**9
 PRICE_PRECISION = 10**9
@@ -35,6 +37,7 @@ def _c(tokens_millions: int) -> int:
     """Convert token cap in whole tokens to on-chain u64."""
     return tokens_millions * TOKEN_DECIMALS
 
+LISTING_PRICE_USD = 0.012
 
 # fmt: off
 SCHEDULE: dict[int, DayConfig] = {
@@ -205,5 +208,23 @@ SCHEDULE: dict[int, DayConfig] = {
     150: DayConfig(_p(0.00791), 36, _c(2_000_000)),
 }
 # fmt: on
+
+
+def _get_presale_day() -> int:
+    """Return the current presale day number (1-based)."""
+    start = date.fromisoformat(settings.presale_start_date)
+    today = datetime.now(timezone.utc).date()
+    return (today - start).days + 1
+
+
+def get_today_token_data() -> DayConfig:
+    day = _get_presale_day()
+    if day < 1:
+        return DayConfig(0, 0, 0)
+    elif day > TOTAL_DAYS:
+        return SCHEDULE[TOTAL_DAYS]
+    return SCHEDULE[day]
+
+
 
 TOTAL_DAYS = len(SCHEDULE)  # 150

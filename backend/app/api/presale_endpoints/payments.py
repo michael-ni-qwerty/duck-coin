@@ -41,11 +41,17 @@ async def get_payment_status(payment_id: str) -> PaymentResponse:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Payment not found",
         )
-        
+
     # Optional: Update status from NOWPayments if it's in a pending state
-    if payment.payment_status in [PaymentStatus.WAITING, PaymentStatus.CONFIRMING, PaymentStatus.SENDING] and payment.nowpayments_payment_id:
+    if (
+        payment.payment_status
+        in [PaymentStatus.WAITING, PaymentStatus.CONFIRMING, PaymentStatus.SENDING]
+        and payment.nowpayments_payment_id
+    ):
         try:
-            nowpayments_status = await nowpayments_client.get_payment_status(payment.nowpayments_payment_id)
+            nowpayments_status = await nowpayments_client.get_payment_status(
+                payment.nowpayments_payment_id
+            )
             status_map = {
                 "waiting": PaymentStatus.WAITING,
                 "confirming": PaymentStatus.CONFIRMING,
@@ -59,7 +65,7 @@ async def get_payment_status(payment_id: str) -> PaymentResponse:
             }
             new_status_str = nowpayments_status.get("payment_status")
             new_status = status_map.get(new_status_str)
-            
+
             if new_status and new_status != payment.payment_status:
                 payment.payment_status = new_status
                 if new_status == PaymentStatus.FINISHED:
@@ -95,18 +101,20 @@ async def get_payment_status(payment_id: str) -> PaymentResponse:
     summary="List payments",
     description="List all payments for a given wallet address.",
 )
-async def list_payments(wallet_address: str, limit: int = 50, offset: int = 0) -> PaymentListResponse:
+async def list_payments(
+    wallet_address: str, limit: int = 50, offset: int = 0
+) -> PaymentListResponse:
     """List payments for a specific wallet address."""
     if not wallet_address:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="wallet_address is required",
         )
-        
+
     payments_qs = Payment.filter(wallet_address=wallet_address)
     total_count = await payments_qs.count()
     payments = await payments_qs.order_by("-created_at").offset(offset).limit(limit)
-    
+
     items = [
         PaymentResponse(
             id=str(p.id),
@@ -129,7 +137,7 @@ async def list_payments(wallet_address: str, limit: int = 50, offset: int = 0) -
         )
         for p in payments
     ]
-    
+
     return PaymentListResponse(
         items=items,
         total_count=total_count,
@@ -198,9 +206,7 @@ async def create_invoice(request: CreateInvoiceRequest) -> CreateInvoiceResponse
             detail="Server misconfiguration: public_api_base_url is required for NOWPayments IPN callbacks",
         )
 
-    ipn_callback_url = (
-        f"{settings.public_api_base_url.rstrip('/')}{settings.api_v1_prefix}/presale/ipn-webhook"
-    )
+    ipn_callback_url = f"{settings.public_api_base_url.rstrip('/')}{settings.api_v1_prefix}/presale/ipn-webhook"
 
     payment = await Payment.create(
         wallet_address=wallet_address,
@@ -256,7 +262,9 @@ async def ipn_webhook(request: Request) -> dict[str, str]:
     sig = request.headers.get("x-nowpayments-sig", "")
     if not NOWPaymentsClient.verify_ipn_signature(body, sig):
         logger.warning("IPN signature verification failed")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid signature")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Invalid signature"
+        )
 
     payload = json.loads(body)
     logger.info(f"IPN received: {payload}")
@@ -302,7 +310,10 @@ async def ipn_webhook(request: Request) -> dict[str, str]:
     if new_status:
         payment.payment_status = new_status
 
-    if new_status == PaymentStatus.FINISHED and payment.credit_status == CreditStatus.PENDING:
+    if (
+        new_status == PaymentStatus.FINISHED
+        and payment.credit_status == CreditStatus.PENDING
+    ):
         payment.paid_at = datetime.now(timezone.utc)
         await payment.save()
 
@@ -320,9 +331,18 @@ async def ipn_webhook(request: Request) -> dict[str, str]:
             logger.info(f"Credited allocation for payment {payment.id}: tx={tx_sig}")
 
             try:
-                await upsert_investor(payment)
+                # Fetch updated on-chain allocation to get claimable_amount (launching_tokens)
+                allocation_data = await solana_service.get_allocation_data(
+                    payment.wallet_address
+                )
+                launching_tokens = (
+                    allocation_data["claimable_amount"] if allocation_data else 0
+                )
+                await upsert_investor(payment, launching_tokens)
             except Exception as inv_err:
-                logger.error(f"Failed to upsert investor for {payment.wallet_address}: {inv_err}")
+                logger.error(
+                    f"Failed to upsert investor for {payment.wallet_address}: {inv_err}"
+                )
         except Exception as e:
             logger.error(f"Failed to credit allocation for payment {payment.id}: {e}")
             payment.credit_status = CreditStatus.FAILED
@@ -330,5 +350,3 @@ async def ipn_webhook(request: Request) -> dict[str, str]:
 
     await payment.save()
     return {"status": "ok"}
-
-

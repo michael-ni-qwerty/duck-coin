@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS investors (
     -- Aggregated totals (updated on each credited payment)
     total_invested_usd NUMERIC(18, 2) NOT NULL DEFAULT 0,
     total_tokens BIGINT NOT NULL DEFAULT 0,
+    launching_tokens BIGINT NOT NULL DEFAULT 0,
     payment_count INTEGER NOT NULL DEFAULT 0,
 
     -- Flexible metadata
