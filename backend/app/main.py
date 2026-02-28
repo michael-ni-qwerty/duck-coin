@@ -11,6 +11,12 @@ from app.api import health, presale_router
 from app.services.solana import solana_service
 from app.workers.daily_config import daily_config_loop
 
+# Configure logging so standard library loggers will output to stdout
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+
 logger = logging.getLogger(__name__)
 
 
