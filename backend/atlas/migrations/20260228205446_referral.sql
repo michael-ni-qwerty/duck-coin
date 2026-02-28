@@ -1,0 +1,4 @@
+-- Modify "investors" table
+ALTER TABLE "investors" ADD COLUMN "referral_code" character varying(32) NULL, ADD COLUMN "referred_by" character varying(128) NULL, ADD COLUMN "total_referral_earnings_usd" numeric(18,2) NOT NULL DEFAULT 0, ADD COLUMN "total_referral_earnings_tokens" bigint NOT NULL DEFAULT 0, ADD COLUMN "referral_count" integer NOT NULL DEFAULT 0, ADD CONSTRAINT "investors_referral_code_key" UNIQUE ("referral_code"), ADD CONSTRAINT "investors_referred_by_fkey" FOREIGN KEY ("referred_by") REFERENCES "investors" ("wallet_address") ON UPDATE NO ACTION ON DELETE NO ACTION;
+-- Modify "payments" table
+ALTER TABLE "payments" ADD COLUMN "referral_code" character varying(32) NULL, ADD COLUMN "referral_reward_usd" numeric(18,2) NULL DEFAULT 0, ADD COLUMN "referral_reward_tokens" bigint NULL DEFAULT 0;

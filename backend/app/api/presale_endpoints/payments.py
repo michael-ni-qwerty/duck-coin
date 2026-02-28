@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 
 from app.core.config import settings
 from app.core.constants import TOKEN_DECIMALS
-from app.models.presale import CreditStatus, Payment, PaymentStatus
+from app.models.presale import CreditStatus, Payment, PaymentStatus, Investor
 from app.schemas.presale import (
     CreateInvoiceRequest,
     CreateInvoiceResponse,
@@ -25,6 +25,110 @@ from .common import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def process_referral_reward(payment: Payment) -> None:
+    """Process referral reward logic and execute on-chain allocation for the referrer."""
+    if not payment.referral_code:
+        return
+
+    try:
+        referrer = await Investor.get_or_none(referral_code=payment.referral_code)
+        if not referrer or referrer.wallet_address == payment.wallet_address:
+            return
+
+        # Calculate 10% reward
+        reward_tokens = int(payment.token_amount * 0.1)
+        reward_usd = float(payment.price_amount_usd) * 0.1
+        reward_usd_raw = int(reward_usd * 10**6)
+
+        # Update payment record with reward info
+        payment.referral_reward_usd = reward_usd
+        payment.referral_reward_tokens = reward_tokens
+
+        # Call on-chain credit_allocation for the referrer
+        referrer_tx_sig = await solana_service.credit_allocation(
+            wallet_address=referrer.wallet_address,
+            token_amount=reward_tokens,
+            usd_amount=reward_usd_raw,
+            payment_id=f"ref_{payment.id}",
+        )
+        logger.info(
+            f"Credited referral allocation for {referrer.wallet_address}: tx={referrer_tx_sig}"
+        )
+
+        # Update referrer stats in DB
+        referrer.total_referral_earnings_usd += reward_usd
+        referrer.total_referral_earnings_tokens += reward_tokens
+
+        # Use extra_data to track referred wallets
+        if "referred_wallets" not in referrer.extra_data:
+            referrer.extra_data["referred_wallets"] = []
+
+        if payment.wallet_address not in referrer.extra_data["referred_wallets"]:
+            referrer.extra_data["referred_wallets"].append(payment.wallet_address)
+            referrer.referral_count += 1
+
+        await referrer.save()
+
+        # Update the referrer's main investor allocation stats as well
+        allocation_data_referrer = await solana_service.get_allocation_data(
+            referrer.wallet_address
+        )
+        referrer_launching_tokens = (
+            allocation_data_referrer["claimable_amount"]
+            if allocation_data_referrer
+            else 0
+        )
+        # Re-calculate totals locally and update DB launching_tokens
+        referrer.total_invested_usd += reward_usd
+        referrer.total_tokens += reward_tokens
+        if referrer_launching_tokens > 0:
+            referrer.launching_tokens = referrer_launching_tokens
+        await referrer.save()
+
+    except Exception as ref_err:
+        logger.error(
+            f"Failed to process referral rewards for payment {payment.id}: {ref_err}"
+        )
+
+
+async def handle_successful_payment(payment: Payment) -> None:
+    """Handle on-chain and DB state updates when a payment is marked as finished."""
+    try:
+        usd_amount_raw = int(float(payment.price_amount_usd) * 10**6)
+        tx_sig = await solana_service.credit_allocation(
+            wallet_address=payment.wallet_address,
+            token_amount=payment.token_amount,
+            usd_amount=usd_amount_raw,
+            payment_id=str(payment.id),
+        )
+        payment.credit_status = CreditStatus.CREDITED
+        payment.credit_tx_signature = tx_sig
+        payment.credited_at = datetime.now(timezone.utc)
+        logger.info(f"Credited allocation for payment {payment.id}: tx={tx_sig}")
+
+        # Process referral rewards
+        await process_referral_reward(payment)
+
+        try:
+            # Fetch updated on-chain allocation to get claimable_amount (launching_tokens)
+            allocation_data = await solana_service.get_allocation_data(
+                payment.wallet_address
+            )
+            launching_tokens = (
+                allocation_data["claimable_amount"] if allocation_data else 0
+            )
+            await upsert_investor(payment, launching_tokens)
+        except Exception as inv_err:
+            logger.error(
+                f"Failed to upsert investor for {payment.wallet_address}: {inv_err}"
+            )
+
+    except Exception as e:
+        logger.error(f"Failed to credit allocation for payment {payment.id}: {e}")
+        payment.credit_status = CreditStatus.FAILED
+        payment.credit_error = str(e)
 
 
 @router.get(
@@ -216,6 +320,7 @@ async def create_invoice(request: CreateInvoiceRequest) -> CreateInvoiceResponse
         token_amount=token_amount,
         payment_status=PaymentStatus.WAITING,
         credit_status=CreditStatus.PENDING,
+        referral_code=request.referral_code,
     )
 
     try:
@@ -317,37 +422,7 @@ async def ipn_webhook(request: Request) -> dict[str, str]:
     ):
         payment.paid_at = datetime.now(timezone.utc)
         await payment.save()
-
-        try:
-            usd_amount_raw = int(float(payment.price_amount_usd) * 10**6)
-            tx_sig = await solana_service.credit_allocation(
-                wallet_address=payment.wallet_address,
-                token_amount=payment.token_amount,
-                usd_amount=usd_amount_raw,
-                payment_id=str(payment.id),
-            )
-            payment.credit_status = CreditStatus.CREDITED
-            payment.credit_tx_signature = tx_sig
-            payment.credited_at = datetime.now(timezone.utc)
-            logger.info(f"Credited allocation for payment {payment.id}: tx={tx_sig}")
-
-            try:
-                # Fetch updated on-chain allocation to get claimable_amount (launching_tokens)
-                allocation_data = await solana_service.get_allocation_data(
-                    payment.wallet_address
-                )
-                launching_tokens = (
-                    allocation_data["claimable_amount"] if allocation_data else 0
-                )
-                await upsert_investor(payment, launching_tokens)
-            except Exception as inv_err:
-                logger.error(
-                    f"Failed to upsert investor for {payment.wallet_address}: {inv_err}"
-                )
-        except Exception as e:
-            logger.error(f"Failed to credit allocation for payment {payment.id}: {e}")
-            payment.credit_status = CreditStatus.FAILED
-            payment.credit_error = str(e)
+        await handle_successful_payment(payment)
 
     await payment.save()
     return {"status": "ok"}

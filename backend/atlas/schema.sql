@@ -22,6 +22,11 @@ CREATE TABLE IF NOT EXISTS payments (
     pay_currency VARCHAR(20),
     actually_paid NUMERIC(28, 12),
 
+    -- Referral tracking
+    referral_code VARCHAR(32),
+    referral_reward_usd NUMERIC(18, 2) DEFAULT 0,
+    referral_reward_tokens BIGINT DEFAULT 0,
+
     -- Status
     payment_status VARCHAR(20) NOT NULL DEFAULT 'waiting',
     credit_status VARCHAR(20) NOT NULL DEFAULT 'pending',
@@ -67,6 +72,13 @@ CREATE TABLE IF NOT EXISTS investors (
     total_tokens BIGINT NOT NULL DEFAULT 0,
     launching_tokens BIGINT NOT NULL DEFAULT 0,
     payment_count INTEGER NOT NULL DEFAULT 0,
+
+    -- Referral System
+    referral_code VARCHAR(32) UNIQUE,
+    referred_by VARCHAR(128) REFERENCES investors(wallet_address),
+    total_referral_earnings_usd NUMERIC(18, 2) NOT NULL DEFAULT 0,
+    total_referral_earnings_tokens BIGINT NOT NULL DEFAULT 0,
+    referral_count INTEGER NOT NULL DEFAULT 0,
 
     -- Flexible metadata
     extra_data JSONB NOT NULL DEFAULT '{}',

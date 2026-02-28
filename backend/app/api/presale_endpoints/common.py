@@ -1,5 +1,7 @@
 import uuid
 import re
+import secrets
+import string
 from datetime import date, datetime, timezone
 
 from app.core.config import settings
@@ -60,26 +62,51 @@ def build_order_id() -> str:
     return str(uuid.uuid4())
 
 
+async def generate_unique_referral_code(length=8) -> str:
+    """Generate a unique alphanumeric referral code."""
+    alphabet = string.ascii_uppercase + string.digits
+    for _ in range(10):
+        code = "".join(secrets.choice(alphabet) for _ in range(length))
+        exists = await Investor.filter(referral_code=code).exists()
+        if not exists:
+            return code
+    # Fallback to longer code if space is congested (extremely unlikely)
+    return "".join(secrets.choice(alphabet) for _ in range(length + 4))
+
+
 async def upsert_investor(payment: Payment, launching_tokens: int = 0) -> None:
     """Create or update the Investor record after a successful credit."""
     now = datetime.now(timezone.utc)
     investor_wallet = payment.wallet_address
-    investor, created = await Investor.get_or_create(
-        wallet_address=investor_wallet,
-        defaults={
-            "total_invested_usd": payment.price_amount_usd,
-            "total_tokens": payment.token_amount,
-            "launching_tokens": launching_tokens,
-            "payment_count": 1,
-            "first_invested_at": now,
-            "last_invested_at": now,
-        },
-    )
-    if not created:
+
+    # Auto-generate referral code for the investor if they don't have one yet
+    investor = await Investor.get_or_none(wallet_address=investor_wallet)
+
+    if not investor:
+        # Creating new investor
+        referral_code = await generate_unique_referral_code()
+
+        investor = await Investor.create(
+            wallet_address=investor_wallet,
+            total_invested_usd=payment.price_amount_usd,
+            total_tokens=payment.token_amount,
+            launching_tokens=launching_tokens,
+            payment_count=1,
+            first_invested_at=now,
+            last_invested_at=now,
+            referral_code=referral_code,
+        )
+    else:
+        # Updating existing investor
         investor.total_invested_usd += payment.price_amount_usd
         investor.total_tokens += payment.token_amount
         if launching_tokens > 0:
             investor.launching_tokens = launching_tokens
         investor.payment_count += 1
         investor.last_invested_at = now
+
+        # Ensure older investors get a referral code
+        if not investor.referral_code:
+            investor.referral_code = await generate_unique_referral_code()
+
         await investor.save()

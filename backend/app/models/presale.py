@@ -53,6 +53,13 @@ class Payment(models.Model):
     pay_currency = fields.CharField(max_length=20, null=True)
     actually_paid = fields.DecimalField(max_digits=28, decimal_places=12, null=True)
 
+    # Referral tracking
+    referral_code = fields.CharField(max_length=32, null=True)
+    referral_reward_usd = fields.DecimalField(
+        max_digits=18, decimal_places=2, default=0
+    )
+    referral_reward_tokens = fields.BigIntField(default=0)
+
     # Status
     payment_status = fields.CharEnumField(
         PaymentStatus, max_length=20, default=PaymentStatus.WAITING
@@ -86,6 +93,17 @@ class Investor(models.Model):
     total_tokens = fields.BigIntField(default=0)
     launching_tokens = fields.BigIntField(default=0)
     payment_count = fields.IntField(default=0)
+
+    # Referral System
+    referral_code = fields.CharField(max_length=32, unique=True, null=True)
+    referred_by = fields.CharField(
+        max_length=128, null=True
+    )  # reference to another investor's wallet_address
+    total_referral_earnings_usd = fields.DecimalField(
+        max_digits=18, decimal_places=2, default=0
+    )
+    total_referral_earnings_tokens = fields.BigIntField(default=0)
+    referral_count = fields.IntField(default=0)
 
     # Flexible metadata (JSONB)
     extra_data = fields.JSONField(default=dict)

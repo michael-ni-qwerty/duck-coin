@@ -19,6 +19,9 @@ class CreateInvoiceRequest(BaseModel):
     cancel_url: Optional[str] = Field(
         None, description="Redirect URL if payment cancelled"
     )
+    referral_code: Optional[str] = Field(
+        None, description="Optional referral code used for this purchase"
+    )
 
 
 class CreateInvoiceResponse(BaseModel):
@@ -121,6 +124,18 @@ class ClaimResponse(BaseModel):
 
 class GetMessageResponse(BaseModel):
     message: str = Field(..., description="The message to be signed by the user")
+
+
+# --- Referral System ---
+
+
+class ReferralStatsResponse(BaseModel):
+    """Statistics for a user's referrals."""
+
+    referral_code: Optional[str]
+    total_referral_earnings_usd: float
+    total_referral_earnings_tokens: float
+    referral_count: int
 
 
 class BindClaimWalletRequest(BaseModel):
