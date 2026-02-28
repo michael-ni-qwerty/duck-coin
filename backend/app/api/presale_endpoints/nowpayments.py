@@ -11,12 +11,32 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 allowed_networks = {
-    'ethereum', 'eth', 'bsc', 'binance-smart-chain', 'polygon', 'matic', 
-    'arbitrum', 'arb', 'avalanche', 'avax', 'fantom', 'ftm', 'optimism',
-    'op', 'base', 'linea', 'zkSync', 'zksync', 'cronos', 'cro', 'solana', 'sol'
+    "ethereum",
+    "eth",
+    "bsc",
+    "binance-smart-chain",
+    "polygon",
+    "matic",
+    "arbitrum",
+    "arb",
+    "avalanche",
+    "avax",
+    "fantom",
+    "ftm",
+    "optimism",
+    "op",
+    "base",
+    "linea",
+    "zkSync",
+    "zksync",
+    "cronos",
+    "cro",
+    "solana",
+    "sol",
 }
 
 temp_not_works = ("1inchbsc", "")
+
 
 class CurrencyItemResponse(BaseModel):
     id: int
@@ -108,16 +128,19 @@ async def get_currencies() -> CurrenciesResponse:
     """Get list of cryptocurrencies available for payment via NOWPayments."""
     try:
         currencies = await nowpayments_client.get_available_currencies()
-        
+
         # Filter for EVM and Solana blockchains only
         allowed_currencies = []
-        
+
         for currency in currencies:
-            if currency and currency.get('network'):
-                network = currency.get('network', '').lower()
-                if network in allowed_networks and currency.get('code').lower() not in temp_not_works:
-                    allowed_currencies.append(currency)
-        
+            if currency and currency.get("network"):
+                network = currency.get("network", "").lower()
+                if (
+                    network in allowed_networks
+                    and currency.get("code", "").lower() not in temp_not_works
+                ):
+                    allowed_currencies.append(CurrencyItemResponse(**currency))
+
         return CurrenciesResponse(currencies=allowed_currencies)
     except Exception as e:
         logger.error(f"Failed to fetch currencies: {e}")
@@ -132,7 +155,9 @@ async def get_currencies() -> CurrenciesResponse:
     response_model=EstimateResponse,
     summary="Get estimated crypto price for USD amount",
 )
-async def get_estimate(usd_amount: float, pay_currency: str = "btc") -> EstimateResponse:
+async def get_estimate(
+    usd_amount: float, pay_currency: str = "btc"
+) -> EstimateResponse:
     """Get estimated amount in a specific crypto for a given USD amount."""
     try:
         estimate = await nowpayments_client.get_estimated_price(
@@ -142,7 +167,9 @@ async def get_estimate(usd_amount: float, pay_currency: str = "btc") -> Estimate
         )
         token_amount = calculate_token_amount(usd_amount)
         estimated_amount_raw = estimate.get("estimated_amount")
-        estimated_amount = float(estimated_amount_raw) if estimated_amount_raw is not None else None
+        estimated_amount = (
+            float(estimated_amount_raw) if estimated_amount_raw is not None else None
+        )
 
         return EstimateResponse(
             usd_amount=usd_amount,

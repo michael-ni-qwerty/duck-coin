@@ -3,13 +3,13 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { getAccount } from "@solana/spl-token";
-import { 
+import {
   provider,
-  program, 
-  ADMIN_WALLET, 
-  TOKEN_MINT, 
+  program,
+  ADMIN_WALLET,
+  TOKEN_MINT,
   PAYMENT_MINT,
-  configPda, 
+  configPda,
   vaultPda,
   assertEq,
   readAllocationSnapshot,
@@ -47,7 +47,7 @@ async function runEvmFlow(): Promise<void> {
   console.log(`Test user (claim wallet): ${testUser.publicKey.toBase58()}`);
   console.log(`EVM Identity: ${evmAddress}`);
   console.log(`Identity Key (hex): ${identityKey.toString("hex")}`);
-  
+
   await fundTestUserIfNeeded(testUser.publicKey, TEST_USER_SOL_TARGET);
 
   // 3. First allocation round (using EVM identity)
@@ -77,7 +77,7 @@ async function runEvmFlow(): Promise<void> {
     (TOKEN_AMOUNT_RAW * BigInt(firstRoundTgePct)) / 100n +
     (TOKEN_AMOUNT_RAW * BigInt(TARGET_TGE_PERCENTAGE)) / 100n;
   const expectedTotalPurchased = TOKEN_AMOUNT_RAW * 2n;
-  
+
   assertEq(
     allocationAfterTwoRounds.amountPurchased,
     expectedTotalPurchased,
@@ -116,7 +116,7 @@ async function runEvmFlow(): Promise<void> {
   const finalAllocation = await readAllocationSnapshot(allocationPda);
   const finalVault = await getAccount(provider.connection, vaultPda);
   const finalUserToken = await getAccount(provider.connection, userAta);
-  
+
   console.log("\n=== FINAL STATE ===");
   console.log(`[FINAL] User total purchased: ${finalAllocation.amountPurchased.toString()}`);
   console.log(`[FINAL] User total claimed: ${finalAllocation.amountClaimed.toString()}`);

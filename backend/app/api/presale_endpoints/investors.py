@@ -6,6 +6,7 @@ from app.schemas.presale import (
     LeaderboardEntryResponse,
     LeaderboardResponse,
     PriceInfoResponse,
+    TokenDataResponse,
 )
 from app.workers.tokenomics import (
     LISTING_PRICE_USD,
@@ -44,7 +45,7 @@ async def get_investor_info(wallet_address: str) -> InvestorInfoResponse:
     return InvestorInfoResponse(
         wallet_address=investor.wallet_address,
         invested=invested_usd,
-        tokens=investor.total_tokens,
+        tokens=investor.total_tokens / 10**9,
         balance=invested_usd,
         launch_evaluation=launch_evaluation,
     )
@@ -62,10 +63,10 @@ async def get_price_info() -> PriceInfoResponse:
     tokenomic = {}
     for day, config in SCHEDULE.items():
         # Convert on-chain price (u64) to float usd by dividing by PRICE_PRECISION
-        tokenomic[day] = {
-            "price_usd": config.price_usd / PRICE_PRECISION,
-            "stage": config.stage,
-        }
+        tokenomic[day] = TokenDataResponse(
+            price_usd=config.price_usd / PRICE_PRECISION,
+            stage=config.stage,
+        )
 
     return PriceInfoResponse(
         day_today=current_day,

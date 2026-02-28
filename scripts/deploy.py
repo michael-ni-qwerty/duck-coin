@@ -62,7 +62,9 @@ def err(msg: str) -> None:
     print(f"{RED}[error ]{NC} {msg}", file=sys.stderr)
 
 
-def run(cmd: list[str], cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess:
+def run(
+    cmd: list[str], cwd: Path | None = None, check: bool = True
+) -> subprocess.CompletedProcess:
     """Run a command and return the result."""
     result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
     if check and result.returncode != 0:
@@ -75,7 +77,15 @@ def run(cmd: list[str], cwd: Path | None = None, check: bool = True) -> subproce
 
 def ensure_path() -> None:
     """Add solana and anchor to PATH if not already present."""
-    solana_bin = Path.home() / ".local" / "share" / "solana" / "install" / "active_release" / "bin"
+    solana_bin = (
+        Path.home()
+        / ".local"
+        / "share"
+        / "solana"
+        / "install"
+        / "active_release"
+        / "bin"
+    )
     avm_bin = Path.home() / ".avm" / "bin"
     extra = f"{solana_bin}:{avm_bin}"
     if str(solana_bin) not in os.environ.get("PATH", ""):
@@ -83,6 +93,7 @@ def ensure_path() -> None:
 
 
 # ── Steps ──────────────────────────────────────────────────────
+
 
 def check_prerequisites() -> None:
     log("Checking prerequisites...")
@@ -131,7 +142,9 @@ def check_wallet(cluster: str) -> str:
             balance = 0
 
         if balance < 1_000_000_000:
-            warn(f"Low balance: {balance / 1e9:.4f} SOL. You may need SOL for deployment.")
+            warn(
+                f"Low balance: {balance / 1e9:.4f} SOL. You may need SOL for deployment."
+            )
             if cluster == "devnet":
                 log("Requesting airdrop...")
                 airdrop = run(["solana", "airdrop", "2"], check=False)
@@ -162,7 +175,15 @@ def get_program_id() -> str:
     if not PROGRAM_KEYPAIR.exists():
         log("Generating program keypair...")
         PROGRAM_KEYPAIR.parent.mkdir(parents=True, exist_ok=True)
-        run(["solana-keygen", "new", "--no-bip39-passphrase", "-o", str(PROGRAM_KEYPAIR)])
+        run(
+            [
+                "solana-keygen",
+                "new",
+                "--no-bip39-passphrase",
+                "-o",
+                str(PROGRAM_KEYPAIR),
+            ]
+        )
 
     program_id = run(["solana-keygen", "pubkey", str(PROGRAM_KEYPAIR)]).stdout.strip()
     log(f"Program ID: {YELLOW}{program_id}{NC}")
@@ -184,7 +205,9 @@ def sync_program_id(program_id: str) -> None:
     warn(f"Updating declare_id! in lib.rs: {current_id} -> {program_id}")
 
     # Update lib.rs
-    new_content = lib_content.replace(f'declare_id!("{current_id}")', f'declare_id!("{program_id}")')
+    new_content = lib_content.replace(
+        f'declare_id!("{current_id}")', f'declare_id!("{program_id}")'
+    )
     LIB_RS.write_text(new_content)
 
     # Update Anchor.toml
@@ -264,7 +287,9 @@ def initialize(cluster: str, program_id: str) -> None:
         print()
 
 
-def print_summary(cluster: str, rpc_url: str, program_id: str, admin_pubkey: str) -> None:
+def print_summary(
+    cluster: str, rpc_url: str, program_id: str, admin_pubkey: str
+) -> None:
     print()
     print("==========================================")
     print(f" {GREEN}Deployment Summary{NC}")
@@ -282,6 +307,7 @@ def print_summary(cluster: str, rpc_url: str, program_id: str, admin_pubkey: str
 
 
 # ── Main ───────────────────────────────────────────────────────
+
 
 def main() -> None:
     cluster = sys.argv[1] if len(sys.argv) > 1 else "localnet"

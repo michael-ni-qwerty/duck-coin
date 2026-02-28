@@ -41,6 +41,8 @@ certifi==2026.1.4
     # via
     #   httpcore
     #   httpx
+cfgv==3.5.0
+    # via pre-commit
 ckzg==2.1.5
     # via eth-account
 click==8.3.1
@@ -56,6 +58,8 @@ cytoolz==1.1.0
     # via eth-utils
 dictdiffer==0.9.0
     # via aerich
+distlib==0.4.0
+    # via virtualenv
 eth-abi==6.0.0b1
     # via eth-account
 eth-account==0.13.7
@@ -85,6 +89,10 @@ eth-utils==5.3.1
     #   rlp
 fastapi==0.129.0
     # via -r backend/requirements.in
+filelock==3.24.3
+    # via
+    #   python-discovery
+    #   virtualenv
 h11==0.16.0
     # via
     #   httpcore
@@ -101,6 +109,8 @@ httpx==0.28.1
     # via
     #   -r backend/requirements.in
     #   solana
+identify==2.6.16
+    # via pre-commit
 idna==3.11
     # via
     #   anyio
@@ -111,8 +121,16 @@ jsonalias==0.1.1
     # via
     #   anchorpy-core
     #   solders
+nodeenv==1.10.0
+    # via pre-commit
 parsimonious==0.10.0
     # via eth-abi
+platformdirs==4.9.2
+    # via
+    #   python-discovery
+    #   virtualenv
+pre-commit==4.5.1
+    # via -r requirements.in
 pycryptodome==3.23.0
     # via eth-keyfile
 pydantic==2.12.5
@@ -130,6 +148,8 @@ pyheck==0.1.5
     # via anchorpy
 pypika-tortoise==0.6.3
     # via tortoise-orm
+python-discovery==1.1.0
+    # via virtualenv
 python-dotenv==1.2.1
     # via
     #   -r backend/requirements.in
@@ -138,7 +158,9 @@ python-dotenv==1.2.1
 pytz==2025.2
     # via tortoise-orm
 pyyaml==6.0.3
-    # via uvicorn
+    # via
+    #   pre-commit
+    #   uvicorn
 regex==2026.2.19
     # via parsimonious
 rlp==4.1.0
@@ -187,6 +209,8 @@ uvicorn[standard]==0.40.0
     # via -r backend/requirements.in
 uvloop==0.22.1
     # via uvicorn
+virtualenv==21.1.0
+    # via pre-commit
 watchfiles==1.1.1
     # via uvicorn
 websockets==15.0

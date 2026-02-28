@@ -11,16 +11,16 @@ const ADMIN_WALLET = Keypair.fromSecretKey(
   new Uint8Array(JSON.parse(fs.readFileSync("/home/michael/.config/solana/id.json", "utf8")))
 );
 
-const programId = new PublicKey("66Qho8H4xsVLBqZNLyvxTwRrgMP319rt5EuN2ZzaFay8");
+const programId = new PublicKey("9GprBhFEyLipafFmS75rta8HGZTU5WPZRG3tWGJDBrmC");
 const [configPda] = PublicKey.findProgramAddressSync([Buffer.from("config")], programId);
-const [vaultPda] = PublicKey.findProgramAddressSync([Buffer.from("vault_v2"), configPda.toBuffer()], programId);
+const [vaultPda] = PublicKey.findProgramAddressSync([Buffer.from("vault"), configPda.toBuffer()], programId);
 
 async function main() {
     console.log(`Vault PDA: ${vaultPda.toBase58()}`);
 
     try {
         const amount = 2_400_000_000n * 1_000_000_000n; // 2.4 Billion tokens
-        
+
         console.log(`Minting ${amount.toString()} tokens to vault...`);
         const sig = await mintTo(
             provider.connection,
@@ -30,7 +30,7 @@ async function main() {
             ADMIN_WALLET,
             amount
         );
-        
+
         console.log(`Minted successfully! TX: ${sig}`);
     } catch (err) {
         console.error("Minting failed:");

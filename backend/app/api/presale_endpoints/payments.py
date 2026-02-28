@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request, status
 
@@ -63,7 +63,7 @@ async def get_payment_status(payment_id: str) -> PaymentResponse:
                 "refunded": PaymentStatus.REFUNDED,
                 "expired": PaymentStatus.EXPIRED,
             }
-            new_status_str = nowpayments_status.get("payment_status")
+            new_status_str = str(nowpayments_status.get("payment_status", ""))
             new_status = status_map.get(new_status_str)
 
             if new_status and new_status != payment.payment_status:

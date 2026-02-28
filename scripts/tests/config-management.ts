@@ -3,12 +3,12 @@
 import * as anchor from "@coral-xyz/anchor";
 import { SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, getAccount, mintTo } from "@solana/spl-token";
-import { 
+import {
   provider,
-  program, 
-  ADMIN_WALLET, 
-  TOKEN_MINT, 
-  configPda, 
+  program,
+  ADMIN_WALLET,
+  TOKEN_MINT,
+  configPda,
   dailyStatePda,
   vaultPda,
   assertEq,
@@ -101,7 +101,7 @@ async function readConfigState(): Promise<void> {
   console.log("\n--- reading config state ---");
   const config = await program.account.presaleConfig.fetch(configPda);
   const dailyState = await program.account.dailyState.fetch(dailyStatePda);
-  
+
   console.log(`[CONFIG] status=${JSON.stringify(config.status)}`);
   console.log(`[CONFIG] tokenPriceUsd=${config.tokenPriceUsd.toString()}`);
   console.log(`[CONFIG] tgePercentage=${Number(config.tgePercentage)}%`);
@@ -170,7 +170,7 @@ async function runConfigManagementTests(): Promise<void> {
   console.log(`Admin: ${ADMIN_WALLET.publicKey.toBase58()}`);
 
   // await readConfigState();
-  
+
   // await setGlobalUnlock(0);
   // await readConfigState();
 

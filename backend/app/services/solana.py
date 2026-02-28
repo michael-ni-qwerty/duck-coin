@@ -295,7 +295,6 @@ class SolanaService:
         new_price: int,
         new_tge: int,
         new_daily_cap: int,
-        new_start_time: int,
     ) -> str:
         """
         Call the update_config instruction on the presale program.
@@ -308,6 +307,8 @@ class SolanaService:
 
         Returns the transaction signature.
         """
+        from datetime import date, datetime, timezone
+
         client = await self._get_client()
         admin = self.admin_keypair
 
@@ -322,6 +323,18 @@ class SolanaService:
         token_mint = Pubkey.from_string(config_data["token_mint"])
         vault_pda, _ = self.get_vault_pda(config_pda)
 
+        # Get start time from settings
+        start_time = 0
+        if settings.presale_start_date:
+            try:
+                start_date = date.fromisoformat(settings.presale_start_date)
+                dt = datetime.combine(
+                    start_date, datetime.min.time(), tzinfo=timezone.utc
+                )
+                start_time = int(dt.timestamp())
+            except Exception as e:
+                logger.error(f"Failed to parse presale_start_date: {e}")
+
         # Anchor discriminator for "update_config"
         discriminator = hashlib.sha256(b"global:update_config").digest()[:8]
 
@@ -331,7 +344,9 @@ class SolanaService:
         ix_data.extend(struct.pack("<Q", new_price))  # new_price: u64
         ix_data.append(new_tge)  # new_tge: u8
         ix_data.extend(struct.pack("<Q", new_daily_cap))  # new_daily_cap: u64
-        ix_data.extend(struct.pack("<q", new_start_time))  # new_start_time: i64 #TODO remove
+        ix_data.extend(
+            struct.pack("<q", start_time)
+        )  # new_start_time: i64 #TODO remove
 
         accounts = [
             AccountMeta(pubkey=config_pda, is_signer=False, is_writable=True),

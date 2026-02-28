@@ -38,9 +38,9 @@ pub struct Initialize<'info> {
     pub daily_state: Account<'info, DailyState>,
     #[account(mut)]
     pub admin: Signer<'info>,
-    
+
     pub token_mint: Account<'info, Mint>,
-    
+
     #[account(
         init,
         payer = admin,
@@ -50,7 +50,7 @@ pub struct Initialize<'info> {
         token::authority = vault_token_account,
     )]
     pub vault_token_account: Account<'info, TokenAccount>,
-    
+
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
     pub rent: Sysvar<'info, Rent>,

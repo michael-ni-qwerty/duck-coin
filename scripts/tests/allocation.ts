@@ -2,11 +2,11 @@
 
 import * as anchor from "@coral-xyz/anchor";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
-import { 
-  program, 
-  ADMIN_WALLET, 
-  TOKEN_MINT, 
-  configPda, 
+import {
+  program,
+  ADMIN_WALLET,
+  TOKEN_MINT,
+  configPda,
   dailyStatePda,
   assertEq,
   readAllocationSnapshot,

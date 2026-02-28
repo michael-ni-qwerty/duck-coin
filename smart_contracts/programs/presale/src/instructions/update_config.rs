@@ -39,11 +39,11 @@ pub fn update_config(
     // 3. Handle daily rollover burn (Unspent amount)
     let unspent = new_daily_cap.saturating_sub(daily_state.sold_today);
     total_burn_amount = total_burn_amount.checked_add(unspent).unwrap();
-    
+
     // Perform actual on-chain burn if there are tokens to burn
     if total_burn_amount > 0 {
         config.total_burned = config.total_burned.checked_add(total_burn_amount).unwrap();
-        
+
         burn_tokens(
             total_burn_amount,
             config.to_account_info().key.as_ref(),
@@ -53,7 +53,7 @@ pub fn update_config(
             ctx.accounts.token_program.to_account_info(),
         )?;
     }
-    
+
     daily_state.current_day = current_day;
     daily_state.sold_today = 0;
 
@@ -93,7 +93,7 @@ fn burn_tokens<'info>(
         from: vault.clone(),
         authority: vault,
     };
-    
+
     let cpi_ctx = CpiContext::new_with_signer(token_program, cpi_accounts, signer);
     token::burn(cpi_ctx, amount)
 }
@@ -106,7 +106,7 @@ pub struct UpdateConfig<'info> {
     pub daily_state: Account<'info, DailyState>,
     #[account(mut)]
     pub admin: Signer<'info>,
-    
+
     // Accounts needed for burning
     #[account(mut)]
     pub token_mint: Account<'info, Mint>,

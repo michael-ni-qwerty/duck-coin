@@ -3,13 +3,13 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Keypair, PublicKey, SYSVAR_RENT_PUBKEY, SystemProgram } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, getAccount } from "@solana/spl-token";
-import { 
+import {
   provider,
-  program, 
-  ADMIN_WALLET, 
-  TOKEN_MINT, 
+  program,
+  ADMIN_WALLET,
+  TOKEN_MINT,
   PAYMENT_MINT,
-  configPda, 
+  configPda,
   dailyStatePda,
   vaultPda,
   assertEq,
@@ -76,7 +76,7 @@ async function runFullFlow(): Promise<void> {
     (TOKEN_AMOUNT_RAW * BigInt(firstRoundTgePct)) / 100n +
     (TOKEN_AMOUNT_RAW * BigInt(TARGET_TGE_PERCENTAGE)) / 100n;
   const expectedTotalPurchased = TOKEN_AMOUNT_RAW * 2n;
-  
+
   assertEq(
     allocationAfterTwoRounds.amountPurchased,
     expectedTotalPurchased,
@@ -116,7 +116,7 @@ async function runFullFlow(): Promise<void> {
   const finalAllocation = await readAllocationSnapshot(allocationPda);
   const finalVault = await getAccount(provider.connection, vaultPda);
   const finalUserToken = await getAccount(provider.connection, userAta);
-  
+
   console.log("\n=== FINAL STATE ===");
   console.log(`[FINAL] User total purchased: ${finalAllocation.amountPurchased.toString()}`);
   console.log(`[FINAL] User total claimed: ${finalAllocation.amountClaimed.toString()}`);

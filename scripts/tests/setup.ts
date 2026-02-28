@@ -3,13 +3,13 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Keypair, SYSVAR_RENT_PUBKEY, SystemProgram } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { 
-  provider, 
-  program, 
-  ADMIN_WALLET, 
-  TOKEN_MINT, 
-  configPda, 
-  dailyStatePda, 
+import {
+  provider,
+  program,
+  ADMIN_WALLET,
+  TOKEN_MINT,
+  configPda,
+  dailyStatePda,
   vaultPda,
   assertEq,
   logBalance,
@@ -20,7 +20,7 @@ import {
 export async function initializePresale(): Promise<void> {
   console.log("\n--- 1) initialize presale ---");
   const startTime = new anchor.BN(Math.floor(Date.now() / 1000) + 86400);
-  
+
   const existingConfig = await program.account.presaleConfig.fetchNullable(configPda);
   if (existingConfig) {
     console.log("Presale already initialized. Updating status to PresaleActive if needed.");

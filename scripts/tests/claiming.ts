@@ -3,12 +3,12 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Keypair, PublicKey, SYSVAR_RENT_PUBKEY, SystemProgram } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, getAccount } from "@solana/spl-token";
-import { 
+import {
   provider,
-  program, 
-  ADMIN_WALLET, 
-  TOKEN_MINT, 
-  configPda, 
+  program,
+  ADMIN_WALLET,
+  TOKEN_MINT,
+  configPda,
   dailyStatePda,
   vaultPda,
   assertEq,
@@ -99,7 +99,7 @@ export async function claimAndAssert(
   try {
     const txSig = await anchor.web3.sendAndConfirmTransaction(provider.connection, tx, [user]);
     console.log(`${label} claim tx=${txSig} (payer=test user)`);
-    
+
     if (expectedClaimDelta === 0n) {
       throw new Error(`${label} claim succeeded but expected NothingToClaim error`);
     }
@@ -172,7 +172,7 @@ async function runClaimingTests(): Promise<void> {
 
   const userAta = await ensureUserAta(testUser);
   console.log(`User ATA: ${userAta.toBase58()}`);
-  
+
   const identityKey = testUser.publicKey.toBuffer();
   await claimAndAssert(testUser, allocationPda, userAta, "TGE", identityKey);
 

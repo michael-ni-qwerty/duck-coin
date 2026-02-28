@@ -3,3 +3,4 @@
 
 # Solana / Anchor interaction scripts
 anchorpy>=0.20.1
+pre-commit>=4.0.0

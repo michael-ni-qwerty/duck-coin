@@ -130,8 +130,12 @@ def build_set_unlock_ix(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Set global vesting unlock percentage")
-    parser.add_argument("unlock_pct", type=int, help="Unlock percentage (0-100, can only increase)")
-    parser.add_argument("--cluster", default="devnet", choices=CLUSTERS.keys(), help="Solana cluster")
+    parser.add_argument(
+        "unlock_pct", type=int, help="Unlock percentage (0-100, can only increase)"
+    )
+    parser.add_argument(
+        "--cluster", default="devnet", choices=CLUSTERS.keys(), help="Solana cluster"
+    )
     args = parser.parse_args()
 
     # Validate
