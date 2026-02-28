@@ -101,17 +101,7 @@ async def daily_config_loop() -> None:
     """Background loop that fires _do_daily_update once per day."""
     # Run once on startup to catch up if we missed the window or just deployed
     logger.info("daily_config: checking if rollover needed on startup...")
-    while True:
-        try:
-            success = await _do_daily_update()
-        except Exception as e:
-            logger.error(f"daily_config: unhandled error on startup: {e}")
-            success = False
-
-        if success:
-            break
-        logger.info("daily_config: startup update failed, retrying in 5 minutes")
-        await asyncio.sleep(300)
+    await _do_daily_update()
 
     # Now enter the regular daily schedule
     while True:
