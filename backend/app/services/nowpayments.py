@@ -7,7 +7,6 @@ API docs: https://documenter.getpostman.com/view/7907941/2s93JusNJt
 
 import hashlib
 import hmac
-import json
 import logging
 from typing import Optional, Dict, Any
 
@@ -68,9 +67,7 @@ class NOWPaymentsClient:
             resp.raise_for_status()
             return resp.json()
 
-    async def get_min_amount(
-        self, currency_from: str = "usd"
-    ) -> Dict[str, Any]:
+    async def get_min_amount(self, currency_from: str = "usd") -> Dict[str, Any]:
         """GET /min-amount — get minimum payment amount."""
         async with httpx.AsyncClient() as client:
             resp = await client.get(
@@ -172,24 +169,17 @@ class NOWPaymentsClient:
         Verify the IPN callback signature from NOWPayments.
 
         NOWPayments signs IPN callbacks with HMAC-SHA512 using the IPN secret key.
-        The payload is sorted by keys before hashing.
+        The payload body should be hashed exactly as received to avoid float formatting issues.
         """
         if not settings.nowpayments_ipn_secret:
             logger.error("IPN secret not configured")
             return False
 
-        try:
-            payload = json.loads(payload_body)
-        except (json.JSONDecodeError, ValueError):
-            logger.error("Failed to parse IPN payload")
-            return False
-
-        # Sort payload by keys and serialize (NOWPayments requirement)
-        sorted_payload = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-
+        # Hash the exact raw bytes received to avoid float notation changes (e.g. 0.000027 -> 2.7e-05)
+        # NOWPayments guarantees the incoming body is already correctly sorted by keys.
         expected_sig = hmac.new(
             settings.nowpayments_ipn_secret.encode("utf-8"),
-            sorted_payload.encode("utf-8"),
+            payload_body,
             hashlib.sha512,
         ).hexdigest()
 
