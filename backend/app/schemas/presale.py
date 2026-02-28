@@ -156,7 +156,7 @@ class LeaderboardEntryResponse(BaseModel):
     rank: int
     wallet_address: str
     total_invested_usd: float
-    total_tokens: int
+    total_tokens: float
     payment_count: int
     last_invested_at: Optional[datetime] = None
 
@@ -188,6 +188,6 @@ class InvestorInfoResponse(BaseModel):
 
     wallet_address: str
     invested: float = Field(..., description="Total USD invested")
-    tokens: int = Field(..., description="Total tokens purchased")
+    tokens: float = Field(..., description="Total tokens purchased")
     balance: float = Field(..., description="Same as invested")
     launch_evaluation: float = Field(..., description="launching_tokens * launch_price")

@@ -91,7 +91,7 @@ async def get_leaderboard(limit: int = 20, offset: int = 0) -> LeaderboardRespon
             rank=offset + idx + 1,
             wallet_address=inv.wallet_address,
             total_invested_usd=float(inv.total_invested_usd),
-            total_tokens=inv.total_tokens,
+            total_tokens=inv.total_tokens / 10**9,
             payment_count=inv.payment_count,
             last_invested_at=inv.last_invested_at,
         )
