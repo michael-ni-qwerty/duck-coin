@@ -31,7 +31,9 @@ VAULT_SEED = b"vault"
 # System program
 SYSTEM_PROGRAM_ID = Pubkey.from_string("11111111111111111111111111111111")
 TOKEN_PROGRAM_ID = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
-ASSOCIATED_TOKEN_PROGRAM_ID = Pubkey.from_string("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
+ASSOCIATED_TOKEN_PROGRAM_ID = Pubkey.from_string(
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+)
 
 
 class SolanaService:
@@ -83,7 +85,9 @@ class SolanaService:
 
     def build_identity_key(self, wallet_address: str) -> bytes:
         if not validate_wallet_address(wallet_address):
-            raise ValueError("Unsupported wallet_address format. Expected Solana or EVM address.")
+            raise ValueError(
+                "Unsupported wallet_address format. Expected Solana or EVM address."
+            )
         normalized_wallet = wallet_address.strip().lower()
         preimage = normalized_wallet.encode("utf-8")
         return hashlib.sha256(preimage).digest()
@@ -173,7 +177,9 @@ class SolanaService:
         """Read and parse an IdentityAllocation account."""
         client = await self._get_client()
         if not validate_wallet_address(wallet_address):
-            raise ValueError("Unsupported wallet_address format. Expected Solana or EVM address.")
+            raise ValueError(
+                "Unsupported wallet_address format. Expected Solana or EVM address."
+            )
 
         identity_key = self.build_identity_key(wallet_address)
         alloc_pda, _ = self.get_allocation_pda(identity_key)
@@ -228,7 +234,9 @@ class SolanaService:
         admin = self.admin_keypair
 
         if not validate_wallet_address(wallet_address):
-            raise ValueError("Unsupported wallet_address format. Expected Solana or EVM address.")
+            raise ValueError(
+                "Unsupported wallet_address format. Expected Solana or EVM address."
+            )
 
         identity_key = self.build_identity_key(wallet_address)
         config_pda, _ = self.get_config_pda()
@@ -243,11 +251,11 @@ class SolanaService:
         payment_id_bytes = payment_id.encode("utf-8")
         ix_data = bytearray()
         ix_data.extend(discriminator)
-        ix_data.extend(identity_key)                                # identity_key: [u8;32]
-        ix_data.extend(struct.pack("<Q", token_amount))             # token_amount: u64
-        ix_data.extend(struct.pack("<Q", usd_amount))               # usd_amount: u64
-        ix_data.extend(struct.pack("<I", len(payment_id_bytes)))    # String length prefix
-        ix_data.extend(payment_id_bytes)                            # String data
+        ix_data.extend(identity_key)  # identity_key: [u8;32]
+        ix_data.extend(struct.pack("<Q", token_amount))  # token_amount: u64
+        ix_data.extend(struct.pack("<Q", usd_amount))  # usd_amount: u64
+        ix_data.extend(struct.pack("<I", len(payment_id_bytes)))  # String length prefix
+        ix_data.extend(payment_id_bytes)  # String data
 
         accounts = [
             AccountMeta(pubkey=config_pda, is_signer=False, is_writable=True),
@@ -282,12 +290,12 @@ class SolanaService:
 
         return sig
 
-
     async def update_config(
         self,
         new_price: int,
         new_tge: int,
         new_daily_cap: int,
+        new_start_time: int,
     ) -> str:
         """
         Call the update_config instruction on the presale program.
@@ -306,20 +314,33 @@ class SolanaService:
         config_pda, _ = self.get_config_pda()
         daily_state_pda, _ = self.get_daily_state_pda()
 
+        # Get config data to get token mint
+        config_data = await self.get_config_data()
+        if not config_data:
+            raise ValueError("Presale config not found on-chain")
+
+        token_mint = Pubkey.from_string(config_data["token_mint"])
+        vault_pda, _ = self.get_vault_pda(config_pda)
+
         # Anchor discriminator for "update_config"
         discriminator = hashlib.sha256(b"global:update_config").digest()[:8]
 
-        # Encode args: new_price(u64) + new_tge(u8) + new_daily_cap(u64)
+        # Encode args: new_price(u64) + new_tge(u8) + new_daily_cap(u64) + new_start_time(i64)
         ix_data = bytearray()
         ix_data.extend(discriminator)
-        ix_data.extend(struct.pack("<Q", new_price))       # new_price: u64
-        ix_data.append(new_tge)                              # new_tge: u8
-        ix_data.extend(struct.pack("<Q", new_daily_cap))    # new_daily_cap: u64
+        ix_data.extend(struct.pack("<Q", new_price))  # new_price: u64
+        ix_data.append(new_tge)  # new_tge: u8
+        ix_data.extend(struct.pack("<Q", new_daily_cap))  # new_daily_cap: u64
+        ix_data.extend(struct.pack("<q", new_start_time))  # new_start_time: i64 #TODO remove
 
         accounts = [
             AccountMeta(pubkey=config_pda, is_signer=False, is_writable=True),
             AccountMeta(pubkey=daily_state_pda, is_signer=False, is_writable=True),
-            AccountMeta(pubkey=admin.pubkey(), is_signer=True, is_writable=False),
+            AccountMeta(pubkey=admin.pubkey(), is_signer=True, is_writable=True),
+            # Accounts needed for burning
+            AccountMeta(pubkey=token_mint, is_signer=False, is_writable=True),
+            AccountMeta(pubkey=vault_pda, is_signer=False, is_writable=True),
+            AccountMeta(pubkey=TOKEN_PROGRAM_ID, is_signer=False, is_writable=False),
         ]
 
         ix = Instruction(self._program_id, bytes(ix_data), accounts)
@@ -355,7 +376,9 @@ class SolanaService:
             raise ValueError(f"Invalid Solana wallet: {e}")
 
         if not validate_wallet_address(wallet_address):
-            raise ValueError("Unsupported wallet_address format. Expected Solana or EVM address.")
+            raise ValueError(
+                "Unsupported wallet_address format. Expected Solana or EVM address."
+            )
 
         identity_key = self.build_identity_key(wallet_address)
         config_pda, _ = self.get_config_pda()
@@ -418,7 +441,9 @@ class SolanaService:
             raise ValueError("Presale config not found on-chain")
 
         if not validate_wallet_address(wallet_address):
-            raise ValueError("Unsupported wallet_address format. Expected Solana or EVM address.")
+            raise ValueError(
+                "Unsupported wallet_address format. Expected Solana or EVM address."
+            )
 
         token_mint = Pubkey.from_string(config_data["token_mint"])
         identity_key = self.build_identity_key(wallet_address)
@@ -438,7 +463,9 @@ class SolanaService:
             except Exception as e:
                 raise ValueError(f"Invalid user token account: {e}")
         else:
-            user_token_account_pk = self.get_associated_token_address(user_pubkey, token_mint)
+            user_token_account_pk = self.get_associated_token_address(
+                user_pubkey, token_mint
+            )
 
         config_pda, _ = self.get_config_pda()
         user_allocation_pda, _ = self.get_allocation_pda(identity_key)
@@ -454,7 +481,9 @@ class SolanaService:
             AccountMeta(pubkey=user_allocation_pda, is_signer=False, is_writable=True),
             AccountMeta(pubkey=user_pubkey, is_signer=True, is_writable=True),
             AccountMeta(pubkey=vault_pda, is_signer=False, is_writable=True),
-            AccountMeta(pubkey=user_token_account_pk, is_signer=False, is_writable=True),
+            AccountMeta(
+                pubkey=user_token_account_pk, is_signer=False, is_writable=True
+            ),
             AccountMeta(pubkey=TOKEN_PROGRAM_ID, is_signer=False, is_writable=False),
         ]
 

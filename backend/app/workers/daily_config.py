@@ -12,7 +12,7 @@ so that PRESALE_START_DATE itself is Day 1.
 
 import asyncio
 import logging
-from datetime import date, datetime, time, timezone, timedelta
+from datetime import datetime, time, timezone, timedelta
 
 from app.core.config import settings
 from app.services.solana import solana_service
@@ -54,10 +54,15 @@ async def _do_daily_update() -> None:
         # Past the last day — send daily_cap=0 which sets status to PresaleEnded
         last = SCHEDULE[TOTAL_DAYS]
         try:
+            # We need to pass new_start_time (fetch from current config)
+            config_data = await solana_service.get_config_data()
+            start_time = config_data["start_time"] if config_data else 0
+
             tx_sig = await solana_service.update_config(
                 new_price=last.price_usd,
                 new_tge=last.tge,
                 new_daily_cap=0,
+                new_start_time=start_time,
             )
             logger.info(f"daily_config: presale ended, tx={tx_sig}")
         except Exception as e:
@@ -71,10 +76,15 @@ async def _do_daily_update() -> None:
     )
 
     try:
+        # We need to pass new_start_time (fetch from current config)
+        config_data = await solana_service.get_config_data()
+        start_time = config_data["start_time"] if config_data else 0
+
         tx_sig = await solana_service.update_config(
             new_price=day_cfg.price_usd,
             new_tge=day_cfg.tge,
             new_daily_cap=day_cfg.daily_cap,
+            new_start_time=start_time,
         )
         logger.info(f"daily_config: rollover complete, tx={tx_sig}")
     except Exception as e:

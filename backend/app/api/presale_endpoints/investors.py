@@ -7,7 +7,12 @@ from app.schemas.presale import (
     LeaderboardResponse,
     PriceInfoResponse,
 )
-from app.workers.tokenomics import LISTING_PRICE_USD, get_today_token_data
+from app.workers.tokenomics import (
+    LISTING_PRICE_USD,
+    SCHEDULE,
+    _get_presale_day,
+    PRICE_PRECISION,
+)
 
 router = APIRouter()
 
@@ -49,10 +54,19 @@ async def get_investor_info(wallet_address: str) -> InvestorInfoResponse:
 )
 async def get_price_info() -> PriceInfoResponse:
     """Get current presale price and future launch price."""
-    current_price_usd = get_today_token_data().price_usd
+    current_day = _get_presale_day()
+    
+    tokenomic = {}
+    for day, config in SCHEDULE.items():
+        # Convert on-chain price (u64) to float usd by dividing by PRICE_PRECISION
+        tokenomic[day] = {
+            "price_usd": config.price_usd / PRICE_PRECISION,
+            "stage": config.stage,
+        }
 
     return PriceInfoResponse(
-        current_price_usd=current_price_usd,
+        day_today=current_day,
+        tokenomic=tokenomic,
         launch_price_usd=LISTING_PRICE_USD,
     )
 

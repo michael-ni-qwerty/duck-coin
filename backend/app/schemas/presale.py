@@ -168,10 +168,18 @@ class LeaderboardResponse(BaseModel):
     items: list[LeaderboardEntryResponse]
 
 
+class TokenDataResponse(BaseModel):
+    """Token data for a specific day."""
+
+    price_usd: float
+    stage: int
+
+
 class PriceInfoResponse(BaseModel):
     """Current and launch token prices in USD."""
 
-    current_price_usd: float
+    day_today: int
+    tokenomic: dict[int, TokenDataResponse]  # day -> token data
     launch_price_usd: float
 
 
