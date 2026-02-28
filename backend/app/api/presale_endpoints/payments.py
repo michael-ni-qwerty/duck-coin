@@ -259,6 +259,15 @@ async def create_invoice(request: CreateInvoiceRequest) -> CreateInvoiceResponse
 async def ipn_webhook(request: Request) -> dict[str, str]:
     """Handle NOWPayments IPN (Instant Payment Notification) callback."""
     body = await request.body()
+
+    # TODO: remove after testing
+    logger.info("=== NOWPAYMENTS WEBHOOK DEBUG ===")
+    logger.info(f"Headers: {dict(request.headers)}")
+    logger.info(f"Raw body: {body.decode('utf-8')}")
+    logger.info(f"Signature: {request.headers.get('x-nowpayments-sig', '')}")
+    logger.info(f"Body: {body}")
+    logger.info("=================================")
+
     sig = request.headers.get("x-nowpayments-sig", "")
     if not NOWPaymentsClient.verify_ipn_signature(body, sig):
         logger.warning("IPN signature verification failed")

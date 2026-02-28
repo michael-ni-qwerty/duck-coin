@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter
 
 from app.models.presale import Investor
 from app.schemas.presale import (
@@ -27,9 +27,12 @@ async def get_investor_info(wallet_address: str) -> InvestorInfoResponse:
     investor = await Investor.get_or_none(wallet_address=wallet_address)
 
     if not investor:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Investor not found",
+        return InvestorInfoResponse(
+            wallet_address=wallet_address,
+            invested=0.0,
+            tokens=0,
+            balance=0.0,
+            launch_evaluation=0.0,
         )
 
     invested_usd = float(investor.total_invested_usd)
@@ -55,7 +58,7 @@ async def get_investor_info(wallet_address: str) -> InvestorInfoResponse:
 async def get_price_info() -> PriceInfoResponse:
     """Get current presale price and future launch price."""
     current_day = _get_presale_day()
-    
+
     tokenomic = {}
     for day, config in SCHEDULE.items():
         # Convert on-chain price (u64) to float usd by dividing by PRICE_PRECISION
