@@ -141,6 +141,20 @@ async def get_currencies() -> CurrenciesResponse:
                 ):
                     allowed_currencies.append(CurrencyItemResponse(**currency))
 
+        def get_sort_key(curr: CurrencyItemResponse) -> tuple[int, int]:
+            code = curr.code.lower()
+            if code.startswith("usdt"):
+                return (1, curr.priority)
+            if code.startswith("usdc"):
+                return (2, curr.priority)
+            if code in ("eth", "bnbbsc", "sol", "matic", "arb", "avax", "op", "cro"):
+                return (3, curr.priority)
+            if code.startswith("busd") or code.startswith("dai"):
+                return (4, curr.priority)
+            return (5, curr.priority)
+
+        allowed_currencies.sort(key=get_sort_key)
+
         return CurrenciesResponse(currencies=allowed_currencies)
     except Exception as e:
         logger.error(f"Failed to fetch currencies: {e}")
