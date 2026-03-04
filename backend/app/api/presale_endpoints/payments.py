@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Request, status
 
 from app.core.config import settings
-from app.core.constants import TOKEN_DECIMALS
+from app.core.utils import scale_from_chain
 from app.models.presale import CreditStatus, Payment, PaymentStatus, Investor
 from app.schemas.presale import (
     CreateInvoiceRequest,
@@ -21,6 +21,7 @@ from .common import (
     calculate_token_amount,
     validate_wallet_address,
     upsert_investor,
+    scale_to_chain,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,9 +39,9 @@ async def process_referral_reward(payment: Payment) -> None:
             return
 
         # Calculate 10% reward
-        reward_tokens = int(payment.token_amount * 0.1)
-        reward_usd = float(payment.price_amount_usd) * 0.1
-        reward_usd_raw = int(reward_usd * 10**6)
+        reward_tokens = payment.token_amount // 10
+        reward_usd = float(payment.price_amount_usd) / 10
+        reward_usd_raw = scale_to_chain(reward_usd)
 
         # Update payment record with reward info
         payment.referral_reward_usd = reward_usd
@@ -96,7 +97,7 @@ async def process_referral_reward(payment: Payment) -> None:
 async def handle_successful_payment(payment: Payment) -> None:
     """Handle on-chain and DB state updates when a payment is marked as finished."""
     try:
-        usd_amount_raw = int(float(payment.price_amount_usd) * 10**6)
+        usd_amount_raw = scale_to_chain(payment.price_amount_usd)
         tx_sig = await solana_service.credit_allocation(
             wallet_address=payment.wallet_address,
             token_amount=payment.token_amount,
@@ -328,7 +329,9 @@ async def create_invoice(request: CreateInvoiceRequest) -> CreateInvoiceResponse
             price_amount=request.usd_amount,
             price_currency="usd",
             order_id=order_id,
-            order_description=f"DuckCoin Presale - {token_amount / TOKEN_DECIMALS:.0f} DUCK tokens",
+            order_description=(
+                f"DuckCoin Presale - {scale_from_chain(token_amount):.0f} DUCK tokens"
+            ),
             ipn_callback_url=ipn_callback_url,
             success_url=request.success_url,
             cancel_url=request.cancel_url,

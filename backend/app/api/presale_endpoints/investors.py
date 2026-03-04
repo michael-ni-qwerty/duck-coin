@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.models.presale import Investor
+from app.core.utils import scale_from_chain
 from app.schemas.presale import (
     InvestorInfoResponse,
     LeaderboardEntryResponse,
@@ -11,8 +12,7 @@ from app.schemas.presale import (
 from app.workers.tokenomics import (
     LISTING_PRICE_USD,
     SCHEDULE,
-    _get_presale_day,
-    PRICE_PRECISION,
+    get_presale_day,
 )
 
 router = APIRouter()
@@ -38,14 +38,13 @@ async def get_investor_info(wallet_address: str) -> InvestorInfoResponse:
 
     invested_usd = float(investor.total_invested_usd)
     launching_tokens = investor.launching_tokens if investor.launching_tokens else 0
-    # launching_tokens is in smallest units, assuming 10^9 decimals
-    tokens_whole = launching_tokens / (10**9)
+    tokens_whole = scale_from_chain(launching_tokens)
     launch_evaluation = tokens_whole * LISTING_PRICE_USD
 
     return InvestorInfoResponse(
         wallet_address=investor.wallet_address,
         invested=invested_usd,
-        tokens=investor.total_tokens / 10**9,
+        tokens=scale_from_chain(investor.total_tokens),
         balance=invested_usd,
         launch_evaluation=launch_evaluation,
     )
@@ -58,13 +57,13 @@ async def get_investor_info(wallet_address: str) -> InvestorInfoResponse:
 )
 async def get_price_info() -> PriceInfoResponse:
     """Get current presale price and future launch price."""
-    current_day = _get_presale_day()
+    current_day = get_presale_day()
 
     tokenomic = {}
     for day, config in SCHEDULE.items():
-        # Convert on-chain price (u64) to float usd by dividing by PRICE_PRECISION
+        # Convert on-chain price (u64) to float usd by dividing by configured precision
         tokenomic[day] = TokenDataResponse(
-            price_usd=config.price_usd / PRICE_PRECISION,
+            price_usd=scale_from_chain(config.price_usd),
             stage=config.stage,
         )
 
@@ -72,6 +71,7 @@ async def get_price_info() -> PriceInfoResponse:
         day_today=current_day,
         tokenomic=tokenomic,
         launch_price_usd=LISTING_PRICE_USD,
+        next_day_price_increase=SCHEDULE[current_day].daily_growth,
     )
 
 
@@ -91,7 +91,7 @@ async def get_leaderboard(limit: int = 20, offset: int = 0) -> LeaderboardRespon
             rank=offset + idx + 1,
             wallet_address=inv.wallet_address,
             total_invested_usd=float(inv.total_invested_usd),
-            total_tokens=inv.total_tokens / 10**9,
+            total_tokens=scale_from_chain(inv.total_tokens),
             payment_count=inv.payment_count,
             last_invested_at=inv.last_invested_at,
         )

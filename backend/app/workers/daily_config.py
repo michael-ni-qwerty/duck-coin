@@ -15,7 +15,7 @@ import logging
 from datetime import datetime, time, timezone, timedelta
 
 from app.services.solana import solana_service
-from app.workers.tokenomics import SCHEDULE, TOTAL_DAYS, _get_presale_day
+from app.workers.tokenomics import SCHEDULE, TOTAL_DAYS, get_presale_day
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ def _seconds_until(target: time) -> float:
 
 
 async def _do_daily_update() -> bool:
-    day = _get_presale_day()
+    day = get_presale_day()
     logger.info(f"daily_config: presale day {day}")
 
     if day < 1:
@@ -74,9 +74,9 @@ async def _do_daily_update() -> bool:
         new_price = day_cfg.price_usd
         new_tge = day_cfg.tge
         new_daily_cap = day_cfg.daily_cap
-        if config_data["token_price_usd"] >= day_cfg.price_usd:
+        if config_data["token_price_usd"] <= day_cfg.price_usd:
             logger.info(
-                "daily_config: on-chain price is already >= today's price, skipping"
+                "daily_config: on-chain price is already <= today's price, skipping"
             )
             return True
         logger.info(

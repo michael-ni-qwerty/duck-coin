@@ -73,25 +73,25 @@ class PresaleConfigResponse(BaseModel):
 
     program_id: str
     token_mint: str
-    token_price_usd: int
+    token_price_usd: float
     tge_percentage: int
     start_time: int
-    daily_cap: int
-    total_sold: int
-    presale_supply: int
-    total_burned: int
+    daily_cap: float
+    total_sold: float
+    presale_supply: float
+    total_burned: float
     status: str
-    total_raised_usd: int
-    sold_today: int
+    total_raised_usd: float
+    sold_today: float
 
 
 class PresaleStatsResponse(BaseModel):
     """Aggregate presale statistics."""
 
-    total_sold: int
-    total_raised_usd: int
+    total_sold: float
+    total_raised_usd: float
     total_participants: int
-    presale_supply: int
+    presale_supply: float
     is_active: bool
 
 
@@ -196,6 +196,7 @@ class PriceInfoResponse(BaseModel):
     day_today: int
     tokenomic: dict[int, TokenDataResponse]  # day -> token data
     launch_price_usd: float
+    next_day_price_increase: float
 
 
 class InvestorInfoResponse(BaseModel):

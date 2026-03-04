@@ -18,6 +18,7 @@ from app.schemas.presale import (
     GetMessageResponse,
 )
 from app.services.solana import solana_service
+from app.core.utils import scale_from_chain
 
 from .common import (
     is_solana_wallet_address,
@@ -48,16 +49,16 @@ async def get_presale_config() -> PresaleConfigResponse:
     return PresaleConfigResponse(
         program_id=settings.presale_program_id,
         token_mint=config["token_mint"],
-        token_price_usd=config["token_price_usd"],
+        token_price_usd=scale_from_chain(config["token_price_usd"]),
         tge_percentage=config["tge_percentage"],
         start_time=config["start_time"],
-        daily_cap=config["daily_cap"],
-        total_sold=config["total_sold"],
-        presale_supply=config["presale_supply"],
-        total_burned=config["total_burned"],
+        daily_cap=scale_from_chain(config["daily_cap"]),
+        total_sold=scale_from_chain(config["total_sold"]),
+        presale_supply=scale_from_chain(config["presale_supply"]),
+        total_burned=scale_from_chain(config["total_burned"]),
         status=config["status"],
-        total_raised_usd=config["total_raised_usd"],
-        sold_today=config["sold_today"],
+        total_raised_usd=scale_from_chain(config["total_raised_usd"]),
+        sold_today=scale_from_chain(config["sold_today"]),
     )
 
 
@@ -295,10 +296,10 @@ async def get_presale_stats() -> PresaleStatsResponse:
 
     if config:
         return PresaleStatsResponse(
-            total_sold=config["total_sold"],
-            total_raised_usd=config["total_raised_usd"],
+            total_sold=scale_from_chain(config["total_sold"]),
+            total_raised_usd=scale_from_chain(config["total_raised_usd"]),
             total_participants=total_participants,
-            presale_supply=config["presale_supply"],
+            presale_supply=scale_from_chain(config["presale_supply"]),
             is_active=config["status"] == "PresaleActive",
         )
 

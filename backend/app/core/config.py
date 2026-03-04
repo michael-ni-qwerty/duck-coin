@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
 
+    decimals: int = 6
+
     # Solana Configuration (for on-chain credit_allocation calls)
     solana_rpc_url: str = "https://api.devnet.solana.com"
     presale_program_id: str = "9GprBhFEyLipafFmS75rta8HGZTU5WPZRG3tWGJDBrmC"

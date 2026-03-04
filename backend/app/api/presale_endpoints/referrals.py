@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.models.presale import Investor
 from app.schemas.presale import ReferralStatsResponse
+from app.core.utils import scale_from_chain
 from .common import validate_wallet_address
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,8 @@ async def get_referral_stats(wallet_address: str) -> ReferralStatsResponse:
     return ReferralStatsResponse(
         referral_code=investor.referral_code,
         total_referral_earnings_usd=float(investor.total_referral_earnings_usd),
-        total_referral_earnings_tokens=float(investor.total_referral_earnings_tokens)
-        / 10**9,
+        total_referral_earnings_tokens=scale_from_chain(
+            investor.total_referral_earnings_tokens
+        ),
         referral_count=investor.referral_count,
     )

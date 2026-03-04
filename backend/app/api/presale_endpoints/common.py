@@ -5,9 +5,9 @@ import string
 from datetime import date, datetime, timezone
 
 from app.core.config import settings
-from app.core.constants import TOKEN_DECIMALS
+from app.core.utils import scale_to_chain, scale_from_chain
 from app.models.presale import Investor, Payment
-from app.workers.tokenomics import PRICE_PRECISION, SCHEDULE, TOTAL_DAYS
+from app.workers.tokenomics import SCHEDULE, TOTAL_DAYS
 
 
 WALLET_ADDRESS_REGEX_MAP: dict[str, re.Pattern[str]] = {
@@ -42,20 +42,20 @@ def is_solana_wallet_address(wallet_address: str) -> bool:
 def get_current_price_usd() -> float:
     """Return the current token price in USD based on the tokenomics schedule."""
     if not settings.presale_start_date:
-        return SCHEDULE[1].price_usd / PRICE_PRECISION
+        return scale_from_chain(SCHEDULE[1].price_usd)
 
     start = date.fromisoformat(settings.presale_start_date)
     today = datetime.now(timezone.utc).date()
     day = (today - start).days + 1
     day = max(1, min(day, TOTAL_DAYS))
-    return SCHEDULE[day].price_usd / PRICE_PRECISION
+    return scale_from_chain(SCHEDULE[day].price_usd)
 
 
 def calculate_token_amount(usd_amount: float) -> int:
     """Calculate token amount in smallest units for a given USD amount."""
     price = get_current_price_usd()
     tokens = usd_amount / price
-    return int(tokens * TOKEN_DECIMALS)
+    return scale_to_chain(tokens)
 
 
 def build_order_id() -> str:
