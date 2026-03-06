@@ -74,6 +74,27 @@ async def generate_unique_referral_code(length=8) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(length + 4))
 
 
+async def ensure_investor_with_referral_code(wallet_address: str) -> Investor:
+    """Get or create an Investor for the wallet and ensure they have a referral_code.
+    Used so users get a referral code as soon as they connect wallet (before first purchase).
+    """
+    wallet = wallet_address.strip().lower()
+    investor = await Investor.get_or_none(wallet_address=wallet)
+
+    if not investor:
+        referral_code = await generate_unique_referral_code()
+        investor = await Investor.create(
+            id=uuid.uuid4(),
+            wallet_address=wallet,
+            referral_code=referral_code,
+        )
+    elif not investor.referral_code:
+        investor.referral_code = await generate_unique_referral_code()
+        await investor.save(update_fields=["referral_code"])
+
+    return investor
+
+
 async def upsert_investor(payment: Payment, launching_tokens: int = 0) -> None:
     """Create or update the Investor record after a successful credit."""
     now = datetime.now(timezone.utc)

@@ -8,7 +8,7 @@ from app.schemas.presale import (
     AttachReferralResponse,
 )
 from app.core.utils import scale_from_chain
-from .common import validate_wallet_address
+from .common import validate_wallet_address, ensure_investor_with_referral_code
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -68,7 +68,7 @@ async def attach_referral(request: AttachReferralRequest) -> AttachReferralRespo
 @router.get(
     "/stats/{wallet_address}",
     response_model=ReferralStatsResponse,
-    summary="Get referral stats",
+    summary="Get referral stats (creates investor with referral_code if needed)",
 )
 async def get_referral_stats(wallet_address: str) -> ReferralStatsResponse:
     if not validate_wallet_address(wallet_address):
@@ -77,15 +77,7 @@ async def get_referral_stats(wallet_address: str) -> ReferralStatsResponse:
             detail="Unsupported wallet_address format.",
         )
 
-    investor = await Investor.get_or_none(wallet_address=wallet_address)
-
-    if not investor:
-        return ReferralStatsResponse(
-            referral_code=None,
-            total_referral_earnings_usd=0.0,
-            total_referral_earnings_tokens=0.0,
-            referral_count=0,
-        )
+    investor = await ensure_investor_with_referral_code(wallet_address)
 
     return ReferralStatsResponse(
         referral_code=investor.referral_code,
