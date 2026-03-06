@@ -41,6 +41,7 @@ temp_not_works = ("1inchbsc", "")
 class CurrencyItemResponse(BaseModel):
     id: int
     code: str
+    display_code: str | None = None
     name: str
     enable: bool
     wallet_regex: str | None = None
@@ -75,6 +76,43 @@ class MinAmountResponse(BaseModel):
     currency_from: str
     min_amount: float
     fiat_equivalent: float | None = None
+
+
+def _format_display_code(code: str, network: str | None = None) -> str:
+    """Format the NOWPayments currency code for display by extracting the network."""
+    if not code:
+        return code
+
+    code_upper = code.upper()
+    if not network:
+        return code_upper
+
+    network_upper = network.upper()
+
+    # Check if code ends with the network name
+    if code_upper.endswith(network_upper) and code_upper != network_upper:
+        base_coin = code_upper[: -len(network_upper)]
+        return f"{base_coin} ({network_upper})"
+
+    # Check for ERC20/BEP20/TRC20 patterns if network is eth/bsc/trx
+    network_mappings = {
+        "ETH": "ERC20",
+        "BSC": "BSC",
+        "TRX": "TRC20",
+        "ARB": "ARB",
+        "MATIC": "POLYGON",
+    }
+
+    mapped_network = network_mappings.get(network_upper)
+    if (
+        mapped_network
+        and code_upper.endswith(mapped_network)
+        and code_upper != mapped_network
+    ):
+        base_coin = code_upper[: -len(mapped_network)]
+        return f"{base_coin} ({mapped_network})"
+
+    return code_upper
 
 
 @router.get(
@@ -139,6 +177,9 @@ async def get_currencies() -> CurrenciesResponse:
                     network in allowed_networks
                     and currency.get("code", "").lower() not in temp_not_works
                 ):
+                    currency["display_code"] = _format_display_code(
+                        currency.get("code", ""), currency.get("network", "")
+                    )
                     allowed_currencies.append(CurrencyItemResponse(**currency))
 
         def get_sort_key(curr: CurrencyItemResponse) -> tuple[int, int]:
