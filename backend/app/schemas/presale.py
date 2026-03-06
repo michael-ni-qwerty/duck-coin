@@ -19,9 +19,6 @@ class CreateInvoiceRequest(BaseModel):
     cancel_url: Optional[str] = Field(
         None, description="Redirect URL if payment cancelled"
     )
-    referral_code: Optional[str] = Field(
-        None, description="Optional referral code used for this purchase"
-    )
 
 
 class CreateInvoiceResponse(BaseModel):
@@ -136,6 +133,21 @@ class ReferralStatsResponse(BaseModel):
     total_referral_earnings_usd: float
     total_referral_earnings_tokens: float
     referral_count: int
+
+
+class AttachReferralRequest(BaseModel):
+    """Request to attach a referral to a wallet address."""
+
+    wallet_address: str = Field(..., description="Buyer's wallet address")
+    referral_code: str = Field(..., description="Referral code to attach")
+
+
+class AttachReferralResponse(BaseModel):
+    """Response after attaching a referral."""
+
+    message: str
+    wallet_address: str
+    referred_by: Optional[str]
 
 
 class BindClaimWalletRequest(BaseModel):

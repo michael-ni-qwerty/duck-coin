@@ -321,8 +321,16 @@ async def create_invoice(request: CreateInvoiceRequest) -> CreateInvoiceResponse
         token_amount=token_amount,
         payment_status=PaymentStatus.WAITING,
         credit_status=CreditStatus.PENDING,
-        referral_code=request.referral_code,
+        referral_code=None,  # Will be populated if investor has a referrer
     )
+
+    # Check if investor has a referrer and set the referral code for this payment
+    investor = await Investor.get_or_none(wallet_address=wallet_address.lower())
+    if investor and investor.referred_by:
+        referrer = await Investor.get_or_none(wallet_address=investor.referred_by)
+        if referrer and referrer.referral_code:
+            payment.referral_code = referrer.referral_code
+            await payment.save(update_fields=["referral_code"])
 
     try:
         invoice = await nowpayments_client.create_invoice(
