@@ -35,10 +35,8 @@ pub mod presale {
         new_price: u64,
         new_tge: u8,
         new_daily_cap: u64,
-        // TODO: delete this after testing
-        new_start_time: i64,
     ) -> Result<()> {
-        instructions::update_config(ctx, new_price, new_tge, new_daily_cap, new_start_time)
+        instructions::update_config(ctx, new_price, new_tge, new_daily_cap)
     }
 
     pub fn set_status(ctx: Context<UpdateConfig>, status: PresaleStatus) -> Result<()> {

@@ -300,15 +300,8 @@ class SolanaService:
         Call the update_config instruction on the presale program.
 
         This triggers the daily rollover: burns unsold tokens from the previous day,
-        resets sold_today to 0, and advances current_day.
-
-        Pass the current on-chain values to keep config unchanged while still
-        triggering the rollover logic.
-
-        Returns the transaction signature.
+        unspents tokens and manuals burns when cap decreases.
         """
-        from datetime import date, datetime, timezone
-
         client = await self._get_client()
         admin = self.admin_keypair
 
@@ -323,30 +316,17 @@ class SolanaService:
         token_mint = Pubkey.from_string(config_data["token_mint"])
         vault_pda, _ = self.get_vault_pda(config_pda)
 
-        # Get start time from settings
-        start_time = 0
-        if settings.presale_start_date:
-            try:
-                start_date = date.fromisoformat(settings.presale_start_date)
-                dt = datetime.combine(
-                    start_date, datetime.min.time(), tzinfo=timezone.utc
-                )
-                start_time = int(dt.timestamp())
-            except Exception as e:
-                logger.error(f"Failed to parse presale_start_date: {e}")
+        new_tge = new_tge
 
         # Anchor discriminator for "update_config"
         discriminator = hashlib.sha256(b"global:update_config").digest()[:8]
 
-        # Encode args: new_price(u64) + new_tge(u8) + new_daily_cap(u64) + new_start_time(i64)
+        # Encode args: new_price(u64) + new_tge(u8) + new_daily_cap(u64)
         ix_data = bytearray()
         ix_data.extend(discriminator)
         ix_data.extend(struct.pack("<Q", new_price))  # new_price: u64
-        ix_data.append(new_tge)  # new_tge: u8
+        ix_data.extend(struct.pack("<B", new_tge))  # new_tge: u8
         ix_data.extend(struct.pack("<Q", new_daily_cap))  # new_daily_cap: u64
-        ix_data.extend(
-            struct.pack("<q", start_time)
-        )  # new_start_time: i64 #TODO remove
 
         accounts = [
             AccountMeta(pubkey=config_pda, is_signer=False, is_writable=True),

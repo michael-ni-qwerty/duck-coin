@@ -2,31 +2,26 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount};
 use crate::state::*;
 use crate::constants::*;
-// use crate::errors::PresaleError;
+use crate::errors::PresaleError;
 
 pub fn update_config(
     ctx: Context<UpdateConfig>,
     new_price: u64,
     new_tge: u8,
     new_daily_cap: u64,
-    // TODO: delete this after testing
-    new_start_time: i64,
 ) -> Result<()> {
     let config = &mut ctx.accounts.config;
     let daily_state = &mut ctx.accounts.daily_state;
     let clock = Clock::get()?;
     let current_day = (clock.unix_timestamp / 86400) as u64;
 
-    // TODO: delete this after testing
-    config.start_time = new_start_time;
-
     // Force ability to update config only in new day
-    // require!(daily_state.current_day < current_day, PresaleError::UpdateConfigOnlyOnNewDay);
+    require!(daily_state.current_day < current_day, PresaleError::UpdateConfigOnlyOnNewDay);
 
     // 1. Invariants: Price can only increase, TGE and daily cap can only decrease
-    // require!(new_price >= config.token_price_usd, PresaleError::PriceCannotDecrease);
-    // require!(new_tge <= config.tge_percentage, PresaleError::TgeCannotIncrease);
-    // require!(new_daily_cap <= config.daily_cap, PresaleError::DailyCapExceedsSupply);
+    require!(new_price >= config.token_price_usd, PresaleError::PriceCannotDecrease);
+    require!(new_tge <= config.tge_percentage, PresaleError::TgeCannotIncrease);
+    require!(new_daily_cap <= config.daily_cap, PresaleError::DailyCapExceedsSupply);
 
     // Calculate total burn amount
     let mut total_burn_amount: u64 = 0;

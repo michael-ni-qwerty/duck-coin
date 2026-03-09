@@ -53,7 +53,7 @@ export async function updateConfigTge(newTgePct: number): Promise<void> {
   }
 
   const tx = await program.methods
-    .updateConfig(config.tokenPriceUsd, newTgePct, config.dailyCap, config.startTime)
+    .updateConfig(config.tokenPriceUsd, newTgePct, config.dailyCap)
     .accounts({
       config: configPda,
       dailyState: dailyStatePda,
@@ -147,7 +147,7 @@ async function changeStartTime(): Promise<void> {
   }
 
   const tx = await program.methods
-    .updateConfig(config.tokenPriceUsd, config.tgePercentage, config.dailyCap, dayTomorrow)
+    .updateConfig(config.tokenPriceUsd, config.tgePercentage, config.dailyCap)
     .accounts({
       config: configPda,
       dailyState: dailyStatePda,
