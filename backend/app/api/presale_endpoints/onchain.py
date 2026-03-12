@@ -58,7 +58,6 @@ async def get_presale_config() -> PresaleConfigResponse:
         total_burned=scale_from_chain(config["total_burned"]),
         status=config["status"],
         total_raised_usd=scale_from_chain(config["total_raised_usd"]),
-        sold_today=scale_from_chain(config["sold_today"]),
     )
 
 

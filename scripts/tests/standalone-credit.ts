@@ -1,18 +1,15 @@
-// ANCHOR_PROVIDER_URL=https://api.devnet.solana.com ANCHOR_WALLET=/home/michael/.config/solana/id.json npx ts-node --project scripts/tsconfig.json scripts/tests/allocation.ts
-
 import * as anchor from "@coral-xyz/anchor";
 import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import {
   program,
   ADMIN_WALLET,
-  TOKEN_MINT,
   configPda,
   dailyStatePda,
   assertEq,
   readAllocationSnapshot,
   TOKEN_AMOUNT_RAW,
   USD_AMOUNT
-} from "./config";
+} from "../config";
 
 export async function creditAllocationForUser(
   identityKey: Buffer | number[],
@@ -82,14 +79,20 @@ export async function creditAllocationForUser(
   return allocationPda;
 }
 
-async function runAllocationTests(): Promise<void> {
-  console.log("Starting allocation and credit tests...");
-  console.log(`Program ID: ${program.programId.toBase58()}`);
-  console.log(`Admin: ${ADMIN_WALLET.publicKey.toBase58()}`);
+export async function creditOnly(): Promise<void> {
+  console.log("\n--- Credit Allocation Standalone Test ---");
+  const args = process.argv.slice(2);
+  let identityKeyStr = args[0];
 
-  const testUser = Keypair.generate();
-  console.log(`Test user: ${testUser.publicKey.toBase58()}`);
-  const identityKey = testUser.publicKey.toBuffer();
+  let identityKey: Buffer;
+  if (identityKeyStr) {
+    identityKey = new PublicKey(identityKeyStr).toBuffer();
+    console.log(`Using provided identity key: ${identityKeyStr}`);
+  } else {
+    const testUser = Keypair.generate();
+    console.log(`Test user generated: ${testUser.publicKey.toBase58()}`);
+    identityKey = testUser.publicKey.toBuffer();
+  }
 
   const configBeforeFirstCredit = await program.account.presaleConfig.fetch(configPda);
   const firstRoundTgePct = Number(configBeforeFirstCredit.tgePercentage);
@@ -102,13 +105,11 @@ async function runAllocationTests(): Promise<void> {
   console.log(`[CHECK] allocation amountPurchased=${allocation.amountPurchased.toString()}`);
   console.log(`[CHECK] allocation claimableAmount=${allocation.claimableAmount.toString()}`);
   console.log(`[CHECK] allocation amountVesting=${allocation.amountVesting.toString()}`);
-
-  console.log("\nAllocation tests completed successfully.");
 }
 
 if (require.main === module) {
-  runAllocationTests().catch((err) => {
-    console.error("Allocation test failed:");
+  creditOnly().catch((err) => {
+    console.error("Credit test failed:");
     console.error(err);
     process.exit(1);
   });

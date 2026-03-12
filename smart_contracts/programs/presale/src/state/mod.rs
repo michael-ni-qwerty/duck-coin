@@ -13,7 +13,6 @@ pub struct PresaleConfig {
     pub total_burned: u64,
     pub status: PresaleStatus,
     pub total_raised_usd: u64,
-    pub sold_today: u64,
     pub global_unlock_pct: u8,
     pub bump: u8,
 }
@@ -28,8 +27,8 @@ pub enum PresaleStatus {
 impl PresaleConfig {
     // admin(32) + token_mint(32) + token_price_usd(8) + tge_percentage(1) + start_time(8)
     // + daily_cap(8) + total_sold(8) + presale_supply(8) + total_burned(8) + status(1)
-    // + total_raised_usd(8) + sold_today(8) + global_unlock_pct(1) + bump(1)
-    pub const LEN: usize = 32 + 32 + 8 + 1 + 8 + 8 + 8 + 8 + 8 + 1 + 8 + 8 + 1 + 1;
+    // + total_raised_usd(8) + global_unlock_pct(1) + bump(1)
+    pub const LEN: usize = 32 + 32 + 8 + 1 + 8 + 8 + 8 + 8 + 8 + 1 + 8 + 1 + 1;
 }
 
 #[account]

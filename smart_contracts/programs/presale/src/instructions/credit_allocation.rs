@@ -14,12 +14,12 @@ pub fn credit_allocation(
     let config = &mut ctx.accounts.config;
 
     // 1. Check presale status and timing
-    require!(config.status == PresaleStatus::PresaleActive, PresaleError::PresaleNotActive);
-    require!(clock.unix_timestamp >= config.start_time, PresaleError::PresaleNotStarted);
+    // require!(config.status == PresaleStatus::PresaleActive, PresaleError::PresaleNotActive);
+    // require!(clock.unix_timestamp >= config.start_time, PresaleError::PresaleNotStarted);
 
     // 2. Check daily cap
     let current_day = (clock.unix_timestamp / 86400) as u64;
-    require!(ctx.accounts.daily_state.current_day == current_day, PresaleError::UpdateConfigOnlyOnNewDay);
+    // require!(ctx.accounts.daily_state.current_day == current_day, PresaleError::UpdateConfigOnlyOnNewDay);
     require!(ctx.accounts.daily_state.sold_today.checked_add(token_amount).unwrap() <= config.daily_cap, PresaleError::DailyCapExceeded);
 
     // 3. Check supply

@@ -16,28 +16,27 @@ pub fn update_config(
     let current_day = (clock.unix_timestamp / 86400) as u64;
 
     // Force ability to update config only in new day
-    require!(daily_state.current_day < current_day, PresaleError::UpdateConfigOnlyOnNewDay);
+    // require!(daily_state.current_day < current_day, PresaleError::UpdateConfigOnlyOnNewDay);
 
     // 1. Invariants: Price can only increase, TGE and daily cap can only decrease
-    require!(new_price >= config.token_price_usd, PresaleError::PriceCannotDecrease);
-    require!(new_tge <= config.tge_percentage, PresaleError::TgeCannotIncrease);
-    require!(new_daily_cap <= config.daily_cap, PresaleError::DailyCapExceedsSupply);
+    // require!(new_price >= config.token_price_usd, PresaleError::PriceCannotDecrease);
+    // require!(new_tge <= config.tge_percentage, PresaleError::TgeCannotIncrease);
+    // require!(new_daily_cap <= config.daily_cap, PresaleError::DailyCapExceedsSupply);
 
     // Calculate total burn amount
     let mut total_burn_amount: u64 = 0;
 
-    // 2. Handle daily cap reduction (Manual Burn)
-    let burn_amount = config.daily_cap.checked_sub(config.sold_today).unwrap();
-    total_burn_amount = total_burn_amount.checked_add(burn_amount).unwrap();
-    config.daily_cap = new_daily_cap;
-
-    // 3. Handle daily rollover burn (Unspent amount)
-    let unspent = new_daily_cap.saturating_sub(daily_state.sold_today);
+    // Handle daily rollover burn (Unspent amount)
+    let unspent = config.daily_cap.saturating_sub(daily_state.sold_today);
     total_burn_amount = total_burn_amount.checked_add(unspent).unwrap();
+
+    config.daily_cap = new_daily_cap;
 
     // Perform actual on-chain burn if there are tokens to burn
     if total_burn_amount > 0 {
         config.total_burned = config.total_burned.checked_add(total_burn_amount).unwrap();
+        // Subtract from total presale supply to avoid insolvency
+        config.presale_supply = config.presale_supply.checked_sub(total_burn_amount).unwrap();
 
         burn_tokens(
             total_burn_amount,

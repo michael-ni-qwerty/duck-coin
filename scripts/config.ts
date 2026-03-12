@@ -1,7 +1,5 @@
-// Shared configuration and utilities for presale tests
-
 import * as anchor from "@coral-xyz/anchor";
-import { Keypair, LAMPORTS_PER_SOL, PublicKey, SYSVAR_RENT_PUBKEY, SystemProgram } from "@solana/web3.js";
+import { Keypair, LAMPORTS_PER_SOL, PublicKey, SYSVAR_RENT_PUBKEY, SystemProgram, Connection, clusterApiUrl } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
   getAccount,
@@ -9,29 +7,70 @@ import {
   mintTo,
 } from "@solana/spl-token";
 import * as fs from "fs";
+import * as path from "path";
+const { transfer } = require("@solana/spl-token");
 
-// Test configuration
-export const TOKEN_MINT = new PublicKey("6YskGKuqzVX9rjxvWkvN3vUC5BH6rZ7faKgzzWjdmLca");
-export const PAYMENT_MINT = new PublicKey("B9xhegJm4vCmzHBm6cgQxRyqVnxRubBgTR953dKJUvQy");
-export const TOKEN_AMOUNT_RAW = 1_000_000_000_000n; // 1000 tokens (9 decimals)
-export const PAYMENT_AMOUNT_RAW = 50_000_000n; // 50.000000 payment tokens (6 decimals)
+
+// Network Configuration
+export const NETWORK: string = process.env.NETWORK || "devnet";
+
+// Hardcoded Mint Addresses
+export const DEVNET_MINT = new PublicKey("FdoibCPmzQm4Ps37GZdKC6CbSLo9HDmMh2Myb6Rf1tYd");
+export const MAINNET_MINT = new PublicKey("BpfcMYvrrRweav64155uSkSnRVPnHK2ZKTXHb2kFiB1H");
+
+export const TOKEN_MINT = NETWORK === "mainnet-beta" ? MAINNET_MINT : DEVNET_MINT;
+
+// Test/Shared configuration
+export const TOKEN_AMOUNT_RAW = 1_000_000_000n; // 1_000 tokens (6 decimals)
 export const TEST_USER_SOL_TARGET = 0.1;
 export const USD_AMOUNT = new anchor.BN("50000000"); // $50.00
 export const GLOBAL_UNLOCK_TARGET = 10;
 export const TARGET_TGE_PERCENTAGE = 30;
 
-// Provider and program setup
-export const provider = anchor.AnchorProvider.env();
-anchor.setProvider(provider);
+
+// Load the default Solana wallet for generic scripts
+const homedir = require("os").homedir();
+const walletFile = NETWORK === "mainnet-beta" ? "duck-coin-wallet.json" : "id.json";
+const secretKeyString = fs.readFileSync(
+  path.join(homedir, ".config", "solana", walletFile),
+  "utf8"
+);
+export const payer = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secretKeyString)));
+
+// Generic connection for non-Anchor scripts
+export const connection = new Connection(
+  NETWORK === "mainnet-beta" ? clusterApiUrl("mainnet-beta") : clusterApiUrl("devnet"),
+  "confirmed"
+);
 
 export const idl = JSON.parse(
   fs.readFileSync(
-    "/home/michael/Desktop/my/duck-coin/smart_contracts/target/idl/presale.json",
+    path.join(__dirname, "../smart_contracts/target/idl/presale.json"),
     "utf8"
   )
 );
-export const program = new anchor.Program(idl, provider) as any;
-export const ADMIN_WALLET = provider.wallet;
+
+// Explicit Program ID and Admin Wallet setup
+export const PROGRAM_ID = new PublicKey("27bjcLeRgfnCAzfTDYgfxnWeuBTWUJeeEVf2RGcYD2B4");
+export const ADMIN_WALLET = new anchor.Wallet(payer);
+
+export const provider = new anchor.AnchorProvider(
+  connection,
+  ADMIN_WALLET,
+  {
+    ...anchor.AnchorProvider.defaultOptions(),
+    commitment: "confirmed",
+    preflightCommitment: "confirmed",
+  }
+);
+anchor.setProvider(provider);
+
+const programIdl = {
+  ...idl,
+  address: PROGRAM_ID.toBase58(),
+};
+
+export const program = new anchor.Program(programIdl, provider) as any;
 
 // PDAs
 export const [configPda] = PublicKey.findProgramAddressSync([Buffer.from("config")], program.programId);
@@ -56,6 +95,18 @@ export function assertEq(actual: bigint | number, expected: bigint | number, mes
 
 export function logBalance(label: string, amount: bigint): void {
   console.log(`[BALANCE] ${label}: ${amount.toString()}`);
+}
+
+export async function confirmTx(signature: string): Promise<void> {
+  const latestBlockhash = await provider.connection.getLatestBlockhash("confirmed");
+  await provider.connection.confirmTransaction(
+    {
+      signature,
+      blockhash: latestBlockhash.blockhash,
+      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+    },
+    "confirmed"
+  );
 }
 
 export async function fundTestUserIfNeeded(user: PublicKey, targetSol: number): Promise<void> {
@@ -98,6 +149,7 @@ export async function ensureVaultLiquidity(minAmount: bigint): Promise<void> {
   }
 
   const topUpAmount = minAmount - vaultBefore.amount;
+
   const mintSig = await mintTo(
     provider.connection,
     ADMIN_WALLET.payer,
@@ -112,7 +164,14 @@ export async function ensureVaultLiquidity(minAmount: bigint): Promise<void> {
 }
 
 export async function readAllocationSnapshot(allocationPda: PublicKey): Promise<AllocationSnapshot> {
-  const allocation = await program.account.userAllocation.fetch(allocationPda);
+  let allocation = await program.account.userAllocation.fetchNullable(allocationPda);
+  for (let attempt = 0; !allocation && attempt < 5; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+    allocation = await program.account.userAllocation.fetchNullable(allocationPda);
+  }
+  if (!allocation) {
+    throw new Error(`Account does not exist or has no data ${allocationPda.toBase58()}`);
+  }
   return {
     amountPurchased: BigInt(allocation.amountPurchased.toString()),
     amountClaimed: BigInt(allocation.amountClaimed.toString()),

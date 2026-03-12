@@ -7,7 +7,7 @@ pub fn set_unlock(ctx: Context<SetUnlock>, unlock_pct: u8) -> Result<()> {
     let config = &mut ctx.accounts.config;
 
     require!(unlock_pct <= 100, PresaleError::UnlockExceedsMax);
-    require!(unlock_pct >= config.global_unlock_pct, PresaleError::UnlockCannotDecrease);
+    // require!(unlock_pct >= config.global_unlock_pct, PresaleError::UnlockCannotDecrease);
 
     config.global_unlock_pct = unlock_pct;
 

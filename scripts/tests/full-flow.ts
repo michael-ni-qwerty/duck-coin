@@ -8,7 +8,6 @@ import {
   program,
   ADMIN_WALLET,
   TOKEN_MINT,
-  PAYMENT_MINT,
   configPda,
   dailyStatePda,
   vaultPda,
@@ -23,23 +22,24 @@ import {
   USD_AMOUNT,
   GLOBAL_UNLOCK_TARGET,
   TARGET_TGE_PERCENTAGE
-} from "./config";
+} from "../config";
 
-// Import functions from other test modules
-import { initializePresale, setGlobalUnlock } from "./setup";
-import { creditAllocationForUser } from "./allocation";
-import { claimAndAssert, setStatusTokenLaunched } from "./claiming";
-import { updateConfigTge } from "./config-management";
+import { initialize } from "./standalone-initialize";
+import { setGlobalUnlock } from "./standalone-unlock";
+import { creditAllocationForUser } from "./standalone-credit";
+import { claimAndAssert } from "./standalone-claim";
+import { setStatusTokenLaunched } from "./standalone-status";
+import { bindClaimWallet } from "./standalone-bind";
+import { updateConfigTge } from "./standalone-config";
 
 async function runFullFlow(): Promise<void> {
   console.log("Starting decomposed presale full-flow tests...");
   console.log(`Program ID: ${program.programId.toBase58()}`);
   console.log(`Admin: ${ADMIN_WALLET.publicKey.toBase58()}`);
   console.log(`Sale token mint: ${TOKEN_MINT.toBase58()}`);
-  console.log(`Payment token mint: ${PAYMENT_MINT.toBase58()}`);
 
   // 1. Setup and initialization
-  await initializePresale();
+  await initialize();
   await setGlobalUnlock(0);
   await ensureVaultLiquidity(TOKEN_AMOUNT_RAW);
 
@@ -93,8 +93,6 @@ async function runFullFlow(): Promise<void> {
   await setStatusTokenLaunched();
 
   // 9. Bind claim wallet (Solana flow: binding same wallet is allowed if not already bound or same)
-  // In the original flow, we didn't have bind_claim_wallet, but since the program now requires it:
-  const { bindClaimWallet } = require("./claiming");
   await bindClaimWallet(identityKey, testUser.publicKey, allocationPda);
 
   // 10. TGE claim

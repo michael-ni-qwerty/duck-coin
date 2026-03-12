@@ -79,7 +79,6 @@ class PresaleConfigResponse(BaseModel):
     total_burned: float
     status: str
     total_raised_usd: float
-    sold_today: float
 
 
 class PresaleStatsResponse(BaseModel):

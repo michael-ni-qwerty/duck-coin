@@ -3,7 +3,7 @@ Daily config update worker.
 
 Runs once per day to call update_config on the Solana presale program.
 This triggers the daily rollover: burns unsold tokens from the previous day,
-resets sold_today to 0, advances current_day, and applies the new day's
+advances current_day, and applies the new day's
 price / TGE / daily_cap from the hardcoded tokenomics schedule.
 
 The current presale day is computed as:  (today_utc - PRESALE_START_DATE).days + 1

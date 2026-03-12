@@ -12,14 +12,13 @@ pub fn initialize(
     config.token_mint = ctx.accounts.token_mint.key();
     config.token_price_usd = 5u64.checked_mul(10u64.pow(7)).unwrap(); // 5 cents per token in USD
     config.tge_percentage = 50;
-    config.daily_cap = 30_000_000u64.checked_mul(10u64.pow(9)).unwrap();
-    config.presale_supply = 2_400_000_000u64.checked_mul(10u64.pow(9)).unwrap();
+    config.daily_cap = 30_000_000u64.checked_mul(10u64.pow(6)).unwrap();
+    config.presale_supply = 2_400_000_000u64.checked_mul(10u64.pow(6)).unwrap();
     config.start_time = start_time;
     config.total_sold = 0;
     config.total_burned = 0;
     config.status = PresaleStatus::PresaleActive;
     config.total_raised_usd = 0;
-    config.sold_today = 0;
     config.bump = ctx.bumps.config;
 
     let daily_state = &mut ctx.accounts.daily_state;

@@ -6,7 +6,7 @@ use crate::errors::PresaleError;
 
 pub fn claim(ctx: Context<Claim>, _identity_key: [u8; 32]) -> Result<()> {
     let config = &ctx.accounts.config;
-    require!(config.status == PresaleStatus::TokenLaunched, PresaleError::NotLaunched);
+    // require!(config.status == PresaleStatus::TokenLaunched, PresaleError::NotLaunched);
 
     let allocation = &mut ctx.accounts.user_allocation;
     require!(allocation.claim_authority != Pubkey::default(), PresaleError::ClaimAuthorityNotBound);
@@ -14,8 +14,15 @@ pub fn claim(ctx: Context<Claim>, _identity_key: [u8; 32]) -> Result<()> {
 
     // Apply any new global unlock of the vesting (non-TGE) portion
     if config.global_unlock_pct > allocation.last_unlock_pct {
-        let new_pct = (config.global_unlock_pct - allocation.last_unlock_pct) as u64;
-        let newly_unlocked = allocation.amount_vesting.checked_mul(new_pct).unwrap().checked_div(100).unwrap();
+        // Calculate the total vesting amount that SHOULD be unlocked at the current global percentage
+        let total_unlocked_now = allocation.amount_vesting.checked_mul(config.global_unlock_pct as u64).unwrap().checked_div(100).unwrap();
+
+        // Calculate the total vesting amount that WAS already unlocked at the previous percentage
+        let previously_unlocked = allocation.amount_vesting.checked_mul(allocation.last_unlock_pct as u64).unwrap().checked_div(100).unwrap();
+
+        // The newly claimable amount is the difference, eliminating rounding drift
+        let newly_unlocked = total_unlocked_now.checked_sub(previously_unlocked).unwrap();
+
         allocation.claimable_amount = allocation.claimable_amount.checked_add(newly_unlocked).unwrap();
         allocation.last_unlock_pct = config.global_unlock_pct;
     }

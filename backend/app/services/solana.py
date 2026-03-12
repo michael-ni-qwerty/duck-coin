@@ -147,8 +147,6 @@ class SolanaService:
         offset += 1
         total_raised_usd = struct.unpack_from("<Q", data, offset)[0]
         offset += 8
-        sold_today = struct.unpack_from("<Q", data, offset)[0]
-        offset += 8
         global_unlock_pct = data[offset]
         offset += 1
 
@@ -166,7 +164,6 @@ class SolanaService:
             "total_burned": total_burned,
             "status": status_map.get(status_byte, "Unknown"),
             "total_raised_usd": total_raised_usd,
-            "sold_today": sold_today,
             "global_unlock_pct": global_unlock_pct,
         }
 
