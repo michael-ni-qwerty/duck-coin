@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
 from app.services.nowpayments import nowpayments_client
+from app.core.utils import scale_from_chain
 
 from .common import calculate_token_amount
 
@@ -65,7 +66,7 @@ class EstimateResponse(BaseModel):
     usd_amount: float
     pay_currency: str
     estimated_amount: float | None = None
-    token_amount: int
+    token_amount: float
 
 
 class StatusResponse(BaseModel):
@@ -230,7 +231,7 @@ async def get_estimate(
             usd_amount=usd_amount,
             pay_currency=pay_currency,
             estimated_amount=estimated_amount,
-            token_amount=token_amount,
+            token_amount=scale_from_chain(token_amount),
         )
     except Exception as e:
         logger.error(f"Failed to get estimate: {e}")

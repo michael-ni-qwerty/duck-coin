@@ -51,7 +51,7 @@ export const idl = JSON.parse(
 );
 
 // Explicit Program ID and Admin Wallet setup
-export const PROGRAM_ID = new PublicKey("27bjcLeRgfnCAzfTDYgfxnWeuBTWUJeeEVf2RGcYD2B4");
+export const PROGRAM_ID = new PublicKey("EBotmNK5mEQX5U3pc6JH5vmAygX1zKtgspycDMs6arqF");
 export const ADMIN_WALLET = new anchor.Wallet(payer);
 
 export const provider = new anchor.AnchorProvider(

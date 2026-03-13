@@ -35,8 +35,6 @@ pub fn update_config(
     // Perform actual on-chain burn if there are tokens to burn
     if total_burn_amount > 0 {
         config.total_burned = config.total_burned.checked_add(total_burn_amount).unwrap();
-        // Subtract from total presale supply to avoid insolvency
-        config.presale_supply = config.presale_supply.checked_sub(total_burn_amount).unwrap();
 
         burn_tokens(
             total_burn_amount,

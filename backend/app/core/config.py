@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     # Solana Configuration (for on-chain credit_allocation calls)
     solana_rpc_url: str = "https://api.devnet.solana.com"
-    presale_program_id: str = "27bjcLeRgfnCAzfTDYgfxnWeuBTWUJeeEVf2RGcYD2B4"
+    presale_program_id: str = "EBotmNK5mEQX5U3pc6JH5vmAygX1zKtgspycDMs6arqF"
     presale_token_mint: str = ""
     # Admin keypair (Base58 encoded) — signs credit_allocation transactions
     admin_private_key: str = ""
