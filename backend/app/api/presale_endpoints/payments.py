@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Request, status
 
@@ -19,6 +20,7 @@ from app.services.solana import solana_service
 from .common import (
     build_order_id,
     calculate_token_amount,
+    normalize_wallet_address,
     validate_wallet_address,
     upsert_investor,
     scale_to_chain,
@@ -40,8 +42,9 @@ async def process_referral_reward(payment: Payment) -> None:
 
         # Calculate 10% reward
         reward_tokens = payment.token_amount // 10
-        reward_usd = float(payment.price_amount_usd) / 10
-        reward_usd_raw = scale_to_chain(reward_usd)
+
+        reward_usd = Decimal(str(float(payment.price_amount_usd) / 10))
+        reward_usd_raw = scale_to_chain(float(reward_usd))
 
         # Update payment record with reward info
         payment.referral_reward_usd = reward_usd
@@ -257,7 +260,7 @@ async def list_payments(
 )
 async def create_invoice(request: CreateInvoiceRequest) -> CreateInvoiceResponse:
     """Create a NOWPayments invoice for token purchase."""
-    wallet_address = request.wallet_address.strip()
+    wallet_address = normalize_wallet_address(request.wallet_address)
     if not wallet_address:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -325,7 +328,7 @@ async def create_invoice(request: CreateInvoiceRequest) -> CreateInvoiceResponse
     )
 
     # Check if investor has a referrer and set the referral code for this payment
-    investor = await Investor.get_or_none(wallet_address=wallet_address.lower())
+    investor = await Investor.get_or_none(wallet_address=wallet_address)
     if investor and investor.referred_by:
         referrer = await Investor.get_or_none(wallet_address=investor.referred_by)
         if referrer and referrer.referral_code:

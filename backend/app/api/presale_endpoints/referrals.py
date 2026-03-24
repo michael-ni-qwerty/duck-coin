@@ -35,16 +35,14 @@ async def attach_referral(request: AttachReferralRequest) -> AttachReferralRespo
         )
 
     # Check for self-referral
-    if referrer.wallet_address.lower() == request.wallet_address.lower():
+    if referrer.wallet_address == request.wallet_address:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot use your own referral code.",
         )
 
     # Find or create the investor
-    investor, created = await Investor.get_or_create(
-        wallet_address=request.wallet_address.lower()
-    )
+    investor, _ = await Investor.get_or_create(wallet_address=request.wallet_address)
 
     # If already attached, return existing (idempotent)
     if investor.referred_by:

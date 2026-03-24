@@ -1,3 +1,4 @@
+from app.api.presale_endpoints.common import normalize_wallet_address
 from fastapi import APIRouter
 
 from app.models.presale import Investor
@@ -25,7 +26,9 @@ router = APIRouter()
 )
 async def get_investor_info(wallet_address: str) -> InvestorInfoResponse:
     """Get detailed information about a specific investor."""
-    investor = await Investor.get_or_none(wallet_address=wallet_address)
+    investor = await Investor.get_or_none(
+        wallet_address=normalize_wallet_address(wallet_address)
+    )
 
     if not investor:
         return InvestorInfoResponse(

@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime
+from app.api.presale_endpoints.common import normalize_wallet_address
 
 
 # --- Invoice / Payment creation ---
@@ -19,6 +20,11 @@ class CreateInvoiceRequest(BaseModel):
     cancel_url: Optional[str] = Field(
         None, description="Redirect URL if payment cancelled"
     )
+
+    @field_validator("wallet_address")
+    @classmethod
+    def normalize_address(cls, v: str) -> str:
+        return normalize_wallet_address(v)
 
 
 class CreateInvoiceResponse(BaseModel):
@@ -53,6 +59,11 @@ class PaymentResponse(BaseModel):
     updated_at: datetime
     paid_at: Optional[datetime]
     credited_at: Optional[datetime]
+
+    @field_validator("wallet_address")
+    @classmethod
+    def normalize_address(cls, v: str) -> str:
+        return normalize_wallet_address(v)
 
 
 class PaymentListResponse(BaseModel):
@@ -107,6 +118,11 @@ class ClaimRequest(BaseModel):
         description="Optional user SPL token account. If omitted, backend derives the user's ATA for the sale mint.",
     )
 
+    @field_validator("wallet_address")
+    @classmethod
+    def normalize_address(cls, v: str) -> str:
+        return normalize_wallet_address(v)
+
 
 class ClaimResponse(BaseModel):
     """Unsigned claim payload response for client-side signing."""
@@ -116,6 +132,11 @@ class ClaimResponse(BaseModel):
     user_token_account: str
     recent_blockhash: str
     unsigned_tx_base64: str
+
+    @field_validator("wallet_address")
+    @classmethod
+    def normalize_address(cls, v: str) -> str:
+        return normalize_wallet_address(v)
 
 
 class GetMessageResponse(BaseModel):
@@ -140,6 +161,11 @@ class AttachReferralRequest(BaseModel):
     wallet_address: str = Field(..., description="Buyer's wallet address")
     referral_code: str = Field(..., description="Referral code to attach")
 
+    @field_validator("wallet_address")
+    @classmethod
+    def normalize_address(cls, v: str) -> str:
+        return normalize_wallet_address(v)
+
 
 class AttachReferralResponse(BaseModel):
     """Response after attaching a referral."""
@@ -147,6 +173,11 @@ class AttachReferralResponse(BaseModel):
     message: str
     wallet_address: str
     referred_by: Optional[str]
+
+    @field_validator("wallet_address")
+    @classmethod
+    def normalize_address(cls, v: str) -> str:
+        return normalize_wallet_address(v)
 
 
 class BindClaimWalletRequest(BaseModel):
@@ -157,6 +188,11 @@ class BindClaimWalletRequest(BaseModel):
         ..., description="Solana wallet address to bind as claim authority"
     )
     signature: str = Field(..., description="The signature of the message")
+
+    @field_validator("wallet_address")
+    @classmethod
+    def normalize_address(cls, v: str) -> str:
+        return normalize_wallet_address(v)
 
 
 class BindClaimWalletResponse(BaseModel):
@@ -185,6 +221,11 @@ class LeaderboardEntryResponse(BaseModel):
     total_tokens: float
     payment_count: int
     last_invested_at: Optional[datetime] = None
+
+    @field_validator("wallet_address")
+    @classmethod
+    def normalize_address(cls, v: str) -> str:
+        return normalize_wallet_address(v)
 
 
 class LeaderboardResponse(BaseModel):
@@ -218,3 +259,8 @@ class InvestorInfoResponse(BaseModel):
     tokens: float = Field(..., description="Total tokens purchased")
     balance: float = Field(..., description="Same as invested")
     launch_evaluation: float = Field(..., description="launching_tokens * launch_price")
+
+    @field_validator("wallet_address")
+    @classmethod
+    def normalize_address(cls, v: str) -> str:
+        return normalize_wallet_address(v)

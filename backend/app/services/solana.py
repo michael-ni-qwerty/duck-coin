@@ -18,7 +18,10 @@ from solders.transaction import Transaction
 from solders.message import Message
 from solana.rpc.async_api import AsyncClient
 from app.core.config import settings
-from app.api.presale_endpoints.common import validate_wallet_address
+from app.api.presale_endpoints.common import (
+    validate_wallet_address,
+    normalize_wallet_address,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +91,7 @@ class SolanaService:
             raise ValueError(
                 "Unsupported wallet_address format. Expected Solana or EVM address."
             )
-        normalized_wallet = wallet_address.strip().lower()
+        normalized_wallet = normalize_wallet_address(wallet_address)
         preimage = normalized_wallet.encode("utf-8")
         return hashlib.sha256(preimage).digest()
 

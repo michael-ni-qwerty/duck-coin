@@ -23,6 +23,7 @@ from app.core.utils import scale_from_chain
 from .common import (
     is_solana_wallet_address,
     validate_wallet_address,
+    normalize_wallet_address,
     classify_wallet_address,
 )
 from eth_account.messages import encode_defunct
@@ -113,7 +114,7 @@ async def get_message(wallet_address: str) -> GetMessageResponse:
     message = (
         f"Welcome to Duck Coin Presale!\n\n"
         f"Click to sign in and verify your ownership of this wallet.\n\n"
-        f"Wallet Address: {wallet_address.lower()}\n"
+        f"Wallet Address: {normalize_wallet_address(wallet_address)}\n"
         f"Nonce: {nonce_str}"
     )
 
@@ -121,7 +122,7 @@ async def get_message(wallet_address: str) -> GetMessageResponse:
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
 
     await AuthMessage.update_or_create(
-        wallet_address=wallet_address.lower(),
+        wallet_address=normalize_wallet_address(wallet_address),
         defaults={"message": message, "expires_at": expires_at},
     )
 
@@ -162,7 +163,7 @@ async def bind_claim_wallet(body: BindClaimWalletRequest) -> BindClaimWalletResp
             try:
                 # 1. Fetch the message from the database
                 auth_message = await AuthMessage.get_or_none(
-                    wallet_address=body.wallet_address.lower()
+                    wallet_address=body.wallet_address
                 )
 
                 # 2. Check if a message exists
@@ -186,7 +187,7 @@ async def bind_claim_wallet(body: BindClaimWalletRequest) -> BindClaimWalletResp
                     encoded_message, signature=body.signature
                 )
 
-                if recovered_address.lower() != body.wallet_address.lower():
+                if normalize_wallet_address(recovered_address) != body.wallet_address:
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
                         detail="Signature verification failed: recovered address does not match wallet_address.",

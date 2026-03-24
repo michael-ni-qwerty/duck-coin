@@ -4,6 +4,8 @@ import secrets
 import string
 from datetime import date, datetime, timezone
 
+from eth_utils.address import to_checksum_address
+
 from app.core.config import settings
 from app.core.utils import scale_to_chain, scale_from_chain
 from app.models.presale import Investor, Payment
@@ -32,6 +34,18 @@ def classify_wallet_address(wallet_address: str) -> str | None:
 def validate_wallet_address(wallet_address: str) -> bool:
     """Validate wallet address against supported blockchain regex mapping."""
     return classify_wallet_address(wallet_address) is not None
+
+
+def normalize_wallet_address(wallet_address: str) -> str:
+    """Normalize EVM wallet address to checksum address. Leaves Solana address unchanged."""
+    wallet_address = wallet_address.strip()
+    if not wallet_address:
+        return wallet_address
+
+    blockchain = classify_wallet_address(wallet_address)
+    if blockchain == "evm":
+        return to_checksum_address(wallet_address)
+    return wallet_address
 
 
 def is_solana_wallet_address(wallet_address: str) -> bool:
@@ -78,7 +92,7 @@ async def ensure_investor_with_referral_code(wallet_address: str) -> Investor:
     """Get or create an Investor for the wallet and ensure they have a referral_code.
     Used so users get a referral code as soon as they connect wallet (before first purchase).
     """
-    wallet = wallet_address.strip().lower()
+    wallet = normalize_wallet_address(wallet_address)
     investor = await Investor.get_or_none(wallet_address=wallet)
 
     if not investor:
